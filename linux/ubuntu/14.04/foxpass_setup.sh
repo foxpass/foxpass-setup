@@ -32,6 +32,9 @@ BIND_DN="cn=$2,$1"
 BIND_PW=$3
 API_KEY=$4
 
+# install nslcd, without the fancy ui
+DEBIAN_FRONTEND=noninteractive apt-get install -y nslcd
+
 # write to foxpass_ssh_keys.sh
 cat > /usr/local/bin/foxpass_ssh_keys.sh <<"EOF"
 #!/bin/sh
@@ -113,3 +116,8 @@ fi
 sed -i 's/passwd:.*/passwd:         compat ldap/' /etc/nsswitch.conf
 sed -i 's/group:.*/group:          compat ldap/' /etc/nsswitch.conf
 sed -i 's/shadow:.*/shadow:         compat ldap/' /etc/nsswitch.conf
+
+# restart nslcd, nscd, ssh
+service nslcd restart
+service nscd restart
+service ssh restart
