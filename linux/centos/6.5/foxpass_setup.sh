@@ -55,7 +55,9 @@ sed -i "s/__API_KEY__/${API_KEY}/" /usr/local/bin/foxpass_ssh_keys.sh
 # make it executable
 chmod +x /usr/local/bin/foxpass_ssh_keys.sh
 
-authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver=ldaps://ldap.foxpass.com --disableldaptls --ldapbasedn=$BASE_DN --enablerfc2307bis --enablemkhomedir --enablecachecreds --update
+authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver=ldaps://ldap.foxpass.com --disableldaptls --ldapbasedn=$BASE_DN --enablemkhomedir --enablecachecreds --update
+
+sed -i "s|TLS_CACERTDIR .*|TLS_CACERT /etc/ssl/certs/ca-bundle.crt|" /etc/openldap/ldap.conf
 
 cat << EOF | python
 from SSSDConfig import SSSDConfig
@@ -69,6 +71,7 @@ domain.set_option('ldap_tls_reqcert', 'demand')
 domain.set_option('ldap_tls_cacert', '/etc/ssl/certs/ca-bundle.crt')
 domain.set_option('ldap_default_bind_dn', '$BIND_DN')
 domain.set_option('ldap_default_authtok', '$BIND_PW')
+domain.set_option('enumerate', True)
 domain.remove_option('ldap_tls_cacertdir')
 
 domain.set_active(True)
