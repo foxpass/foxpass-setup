@@ -117,6 +117,9 @@ sed -i 's/passwd:.*/passwd:         compat ldap/' /etc/nsswitch.conf
 sed -i 's/group:.*/group:          compat ldap/' /etc/nsswitch.conf
 sed -i 's/shadow:.*/shadow:         compat ldap/' /etc/nsswitch.conf
 
+# give "sudo" group sudo permissions without password
+sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers
+
 # restart nslcd, nscd, ssh
 service nslcd restart
 service nscd restart

@@ -89,6 +89,9 @@ AuthorizedKeysCommandRunAs	nobody
 EOF
 fi
 
+# give "wheel" group sudo permissions without password
+sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers
+
 # restart ssh and sssd
 service sshd restart
 service sssd restart
