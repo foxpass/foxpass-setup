@@ -59,6 +59,9 @@ authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --ena
 
 sed -i "s|TLS_CACERTDIR .*|TLS_CACERT /etc/ssl/certs/ca-bundle.crt|" /etc/openldap/ldap.conf
 
+# wait a bit so that the timestamp of sssd.conf changes with the next set of modifications.
+sleep 2
+
 cat << EOF | python
 from SSSDConfig import SSSDConfig
 
