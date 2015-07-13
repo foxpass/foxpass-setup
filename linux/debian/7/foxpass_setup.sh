@@ -58,8 +58,8 @@ EOF
 # swap in the API key
 sed -i "s/__API_KEY__/${API_KEY}/" /foxpass_ssh_keys.sh
 
-# make it executable
-chmod 755 /foxpass_ssh_keys.sh
+# give permissions only to root to protect the API key inside
+chmod 700 /foxpass_ssh_keys.sh
 
 # write nslcd.conf, with substutions
 
@@ -105,7 +105,7 @@ if ! grep -q AuthorizedKeysCommand /etc/ssh/sshd_config; then
   cat >> /etc/ssh/sshd_config <<EOF
 
 AuthorizedKeysCommand		/foxpass_ssh_keys.sh
-AuthorizedKeysCommandUser	nobody
+AuthorizedKeysCommandUser	root
 EOF
 fi
 
