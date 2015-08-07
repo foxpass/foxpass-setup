@@ -33,7 +33,7 @@ BIND_PW=$3
 API_KEY=$4
 
 # install dependencies, without the fancy ui
-DEBIAN_FRONTEND=noninteractive apt-get install -y libnss-ldapd nscd nslcd
+DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd
 
 # write to foxpass_ssh_keys.sh
 cat > /usr/local/bin/foxpass_ssh_keys.sh <<"EOF"

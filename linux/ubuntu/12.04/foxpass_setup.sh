@@ -36,7 +36,7 @@ add-apt-repository -y ppa:natecarlson/precisebackports
 apt-get update
 
 # install dependencies, without the fancy ui
-DEBIAN_FRONTEND=noninteractive apt-get install -y libnss-ldapd nscd nslcd
+DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd
 DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server
 
 # write to foxpass_ssh_keys.sh
