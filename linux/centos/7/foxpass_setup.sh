@@ -84,6 +84,7 @@ EOF
 # add to bottom of sshd_config if it's not already set
 if ! grep -q "^AuthorizedKeysCommand" /etc/ssh/sshd_config; then
   cat >> /etc/ssh/sshd_config <<EOF
+
 AuthorizedKeysCommand		/usr/local/bin/foxpass_ssh_keys.sh
 AuthorizedKeysCommandUser	root
 EOF
