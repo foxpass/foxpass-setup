@@ -50,7 +50,7 @@ eval home_dir="~${user}"
 secret="__API_KEY__"
 hostname=`hostname`
 
-curl -q -f "https://www.foxpass.com/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
+curl -q -f "https://api.foxpass.com/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
 
 exit $?
 EOF
