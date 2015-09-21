@@ -32,8 +32,13 @@ BIND_DN="cn=$2,$1"
 BIND_PW=$3
 API_KEY=$4
 
-# Make sure we get fresh content
-apt-get update;
+NOW=`date +%s`
+APT_CACHE_AGE=`stat -c %Z /var/lib/apt/periodic/update-success-stamp`
+
+# Check for stale content
+if [ $(($NOW-$APT_CACHE_AGE)) -ge 600000 ]; then
+        apt-get update;
+fi
 
 # install dependencies, without the fancy ui
 DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd
