@@ -94,6 +94,8 @@ tls_cacertfile /etc/ssl/certs/ca-certificates.crt
 nss_initgroups_ignoreusers ALLLOCAL
 EOF
 
+chmod 600 /etc/nslcd.conf
+
 # add to bottom of sshd_config if it's not already set
 if ! grep -q AuthorizedKeysCommand /etc/ssh/sshd_config; then
   cat >> /etc/ssh/sshd_config <<EOF
