@@ -32,6 +32,9 @@ BIND_DN="cn=$2,$1"
 BIND_PW=$3
 API_KEY=$4
 
+# Make sure we get fresh content
+apt-get update;
+
 # install dependencies, without the fancy ui
 DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd
 
@@ -94,7 +97,8 @@ tls_cacertfile /etc/ssl/certs/ca-certificates.crt
 nss_initgroups_ignoreusers ALLLOCAL
 EOF
 
-chmod 600 /etc/nslcd.conf
+# Enforce the right state on the config file.
+chmod 640 /etc/nslcd.conf
 
 # add to bottom of sshd_config if it's not already set
 if ! grep -q AuthorizedKeysCommand /etc/ssh/sshd_config; then
