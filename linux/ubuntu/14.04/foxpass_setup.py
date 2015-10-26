@@ -40,23 +40,14 @@ def main():
     parser.add_argument('--bind-pw', required=True, help='Bind Password')
     parser.add_argument('--api-key', required=True, help='API Key')
     parser.add_argument('--ldap-uri', default='ldaps://ldap.foxpass.com', help='LDAP Server')
-    parser.add_argument('--api-url', default='https://api.foxpass.com')
+    parser.add_argument('--api-url', default='https://api.foxpass.com', help='API Url')
 
     args = parser.parse_args()
-    print(args)
 
     binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
 
-    now=datetime.now()
-    apt_cache_age=datetime.fromtimestamp(os.stat('/var/lib/apt/periodic/update-success-stamp').st_mtime)
-    delta = now-apt_cache_age
-
-    if delta.days > 7:
-        os.system('apt-get update')
-
-    # install dependencies, without the fancy ui
-    os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
-
+    apt_get_update()
+    install_dependencies()
     write_foxpass_ssh_keys_script(args.api_url, args.api_key)
     write_nslcd_conf(uri=args.ldap_uri, basedn=args.base_dn, binddn=binddn, bindpw=args.bind_pw)
     augment_sshd_config()
@@ -64,6 +55,20 @@ def main():
     fix_nsswitch()
     fix_sudo()
     restart()
+
+
+def apt_get_update():
+    now=datetime.now()
+    apt_cache_age=datetime.fromtimestamp(os.stat('/var/lib/apt/periodic/update-success-stamp').st_mtime)
+    delta = now-apt_cache_age
+
+    if delta.days > 7:
+        os.system('apt-get update')
+
+
+def install_dependencies():
+    # install dependencies, without the fancy ui
+    os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
 
 
 def write_foxpass_ssh_keys_script(api_url, api_key):
