@@ -41,6 +41,7 @@ def main():
     parser.add_argument('--api-key', required=True, help='API Key')
     parser.add_argument('--ldap-uri', default='ldaps://ldap.foxpass.com', help='LDAP Server')
     parser.add_argument('--api-url', default='https://api.foxpass.com', help='API Url')
+    parser.add_argument('--ldap_connections', default=2, help='Number of connections to make to LDAP server.')
 
     args = parser.parse_args()
 
@@ -49,7 +50,8 @@ def main():
     apt_get_update()
     install_dependencies()
     write_foxpass_ssh_keys_script(args.api_url, args.api_key)
-    write_nslcd_conf(uri=args.ldap_uri, basedn=args.base_dn, binddn=binddn, bindpw=args.bind_pw)
+    write_nslcd_conf(uri=args.ldap_uri, basedn=args.base_dn, binddn=binddn, bindpw=args.bind_pw,
+                     threads=int(args.ldap_connections))
     augment_sshd_config()
     augment_pam()
     fix_nsswitch()
@@ -104,12 +106,15 @@ exit $?
 
 
 # write nslcd.conf, with substutions
-def write_nslcd_conf(uri, basedn, binddn, bindpw):
+def write_nslcd_conf(uri, basedn, binddn, bindpw, threads):
     with open('/etc/nslcd.conf', "w") as w:
         content = """\
 # /etc/nslcd.conf
 # nslcd configuration file. See nslcd.conf(5)
 # for details.
+
+# number of threads. one LDAP connction per thread.
+threads {threads}
 
 # The user and group nslcd should run as.
 uid nslcd
@@ -145,7 +150,8 @@ nss_initgroups_ignoreusers ALLLOCAL
         sslstatus='off'
         if uri.startswith('ldaps://'):
             sslstatus='on'
-        w.write(content.format(uri=uri, basedn=basedn, binddn=binddn, bindpw=bindpw, sslstatus=sslstatus))
+        w.write(content.format(uri=uri, basedn=basedn, binddn=binddn, bindpw=bindpw,
+                               sslstatus=sslstatus, threads=threads))
 
 
 def augment_sshd_config():
