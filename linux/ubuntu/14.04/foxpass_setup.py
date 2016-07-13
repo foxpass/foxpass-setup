@@ -30,6 +30,7 @@
 import argparse
 from datetime import datetime
 import os
+import os.path
 import sys
 import urllib3
 
@@ -60,12 +61,20 @@ def main():
 
 
 def apt_get_update():
-    now=datetime.now()
-    apt_cache_age=datetime.fromtimestamp(os.stat('/var/lib/apt/periodic/update-success-stamp').st_mtime)
-    delta = now-apt_cache_age
+    # This section requires that the update-notifier package be installed.
+    update_notifier_file = '/var/lib/apt/periodic/update-success-stamp'
+    notifier_file_exists = os.path.isfile(update_notifier_file)
 
-    if delta.days > 7:
+    if not notifier_file_exists:
+        # No way to check last apt-get update, so we always run.
         os.system('apt-get update')
+    else:
+        # Otherwise only if it hasn't been updated in over 7 days.
+        now = datetime.now()
+        apt_cache_age = datetime.fromtimestamp(os.stat(update_notifier).st_mtime)
+        delta = now - apt_cache_age
+        if delta.days > 7:
+            os.system('apt-get update')
 
 
 def install_dependencies():
