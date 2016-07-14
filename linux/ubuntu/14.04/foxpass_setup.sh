@@ -32,12 +32,29 @@ BIND_DN="cn=$2,$1"
 BIND_PW=$3
 API_KEY=$4
 
-NOW=`date +%s`
-APT_CACHE_AGE=`stat -c %Z /var/lib/apt/periodic/update-success-stamp`
+# return success if cache is in-date
+# return failure if cache is out of date
+function cache_up_to_date() {
+  local update_notifier_file='/var/lib/apt/periodic/update-success-stamp'
+  if [[ ! -e $update_notifier_file ]]; then
+    return 1
+  else
+    local now=$(date +%s)
+    local apt_cache_age=$(stat -c %Z $update_notifier_file)
+    local time_since_last_update=$((now - apt_cache_age))
+    local seven_days=$((7 * 24 * 3600))
+
+    if [[ time_since_last_update >= seven_days ]]; then
+      return 1
+    else
+      return 0
+    fi
+  fi
+}
 
 # Check for stale content
-if [ $(($NOW-$APT_CACHE_AGE)) -ge 600000 ]; then
-        apt-get update;
+if ! cache_up_to_date; then
+  apt-get update
 fi
 
 # install dependencies, without the fancy ui
