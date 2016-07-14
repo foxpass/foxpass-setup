@@ -71,7 +71,7 @@ def apt_get_update():
     else:
         # Otherwise only if it hasn't been updated in over 7 days.
         now = datetime.now()
-        apt_cache_age = datetime.fromtimestamp(os.stat(update_notifier).st_mtime)
+        apt_cache_age = datetime.fromtimestamp(os.stat(update_notifier_file).st_mtime)
         delta = now - apt_cache_age
         if delta.days > 7:
             os.system('apt-get update')
