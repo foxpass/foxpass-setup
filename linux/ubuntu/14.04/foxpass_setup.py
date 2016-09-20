@@ -79,7 +79,11 @@ def apt_get_update():
 
 def install_dependencies():
     # install dependencies, without the fancy ui
-    os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
+    # capture the return code and exit passing the code if apt-get fails
+    return_code = os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
+    if return_code != 0:
+        # bitshift right 4 to get rid of the signal portion of the return code
+        sys.exit(return_code >> 4)
 
 
 def write_foxpass_ssh_keys_script(api_url, api_key):
