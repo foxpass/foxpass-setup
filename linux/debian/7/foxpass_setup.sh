@@ -49,6 +49,7 @@ user="$1"
 eval home_dir="~${user}"
 secret="__API_KEY__"
 hostname=`hostname`
+if `grep -q ^${username} /etc/passwd`; then exit 1; fi
 
 curl -q -f "https://api.foxpass.com/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
 

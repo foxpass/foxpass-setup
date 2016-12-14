@@ -95,6 +95,7 @@ def write_foxpass_ssh_keys_script(api_url, api_key):
 user="$1"
 secret="%s"
 hostname=`hostname`
+if `grep -q ^${username} /etc/passwd`; then exit 1; fi
 aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
 curl -s -q -f "%s/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}&aws_instance_id=${aws_instance_id}" 2>/dev/null
 
@@ -107,6 +108,7 @@ exit $?
 user="$1"
 secret="%s"
 hostname=`hostname`
+if `grep -q ^${username} /etc/passwd`; then exit 1; fi
 
 curl -s -q -f "%s/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
 
