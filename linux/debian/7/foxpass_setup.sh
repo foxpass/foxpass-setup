@@ -48,9 +48,9 @@ cat > /foxpass_ssh_keys.sh <<"EOF"
 user="$1"
 secret="__API_KEY__"
 hostname=`hostname`
-if `grep -q "${user}:" /etc/passwd`; then exit 1; fi
+if `grep -q "^${user}:" /etc/passwd`; then exit 1; fi
 
-curl -q -f "https://api.foxpass.com/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
+curl -q -m 5 -f "https://api.foxpass.com/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
 
 exit $?
 EOF
