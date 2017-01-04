@@ -95,7 +95,7 @@ exit $?
 user="$1"
 secret="%s"
 hostname=`hostname`
-if `grep -q "^${user}:" /etc/passwd`; then exit 1; fi
+if grep -q "^${user}:" /etc/passwd; then exit 1; fi
 
 curl -s -q -m 5 -f "%s/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
 
