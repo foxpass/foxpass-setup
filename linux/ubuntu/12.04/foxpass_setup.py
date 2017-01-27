@@ -67,20 +67,7 @@ def add_repo():
 
 
 def apt_get_update():
-    # This section requires that the update-notifier package be installed.
-    update_notifier_file = '/var/lib/apt/periodic/update-success-stamp'
-    notifier_file_exists = os.path.isfile(update_notifier_file)
-
-    if not notifier_file_exists:
-        # No way to check last apt-get update, so we always run.
-        os.system('apt-get update')
-    else:
-        # Otherwise only if it hasn't been updated in over 7 days.
-        now = datetime.now()
-        apt_cache_age = datetime.fromtimestamp(os.stat(update_notifier_file).st_mtime)
-        delta = now - apt_cache_age
-        if delta.days > 7:
-            os.system('apt-get update')
+    os.system('apt-get update')
 
 
 def install_dependencies():
