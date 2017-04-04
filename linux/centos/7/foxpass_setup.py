@@ -38,16 +38,22 @@ def main():
     parser.add_argument('--bind-pw', required=True, help='Bind Password')
     parser.add_argument('--api-key', required=True, help='API Key')
     parser.add_argument('--ldap-uri', default='ldaps://ldap.foxpass.com', help='LDAP Server')
+    parser.add_argument('--secondary-ldap', dest='ldaps', default=[], action='append', help='Secondary LDAP Server(s)')
     parser.add_argument('--api-url', default='https://api.foxpass.com', help='API Url')
+    parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--ldap-connections', default=2, help='Number of connections to make to LDAP server.')
 
     args = parser.parse_args()
 
     bind_dn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
 
+    uris = [args.ldap_uri]
+    for uri in args.ldaps:
+        uris.append(uri)
+
     install_dependencies()
     write_foxpass_ssh_keys_script(args.api_url, args.api_key)
-    run_authconfig(args.ldap_uri, args.base_dn)
+    run_authconfig(uri, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw)
     augment_sshd_config()
     fix_sudo()
@@ -99,8 +105,8 @@ exit $?
         os.system('chmod 700 /usr/local/bin/foxpass_ssh_keys.sh')
 
 
-def run_authconfig(uri, base_dn):
-    cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=uri, base_dn=base_dn)
+def run_authconfig(uris, base_dn):
+    cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=join(uris), base_dn=base_dn)
     print 'Running %s' % cmd
     os.system(cmd)
 
