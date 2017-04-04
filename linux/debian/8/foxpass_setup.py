@@ -53,9 +53,9 @@ def main():
     for uri in args.ldaps:
         uris.append('uri %s' % uri)
 
-    curls = ['curl -s -q -m 5 -f "%s/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}&aws_instance_id=${aws_instance_id}" 2>/dev/null' % args.api_url]
+    curls = ['curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}&aws_instance_id=${aws_instance_id}" 2>/dev/null' % args.api_url]
     for api in args.apis:
-        apis.append('curl -s -q -m 5 -f "%s/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}&aws_instance_id=${aws_instance_id}" 2>/dev/null' % api)
+        apis.append('curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}&aws_instance_id=${aws_instance_id}" 2>/dev/null' % api)
 
     seperator = ' || '
 
