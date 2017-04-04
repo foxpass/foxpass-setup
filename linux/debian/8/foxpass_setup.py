@@ -49,21 +49,20 @@ def main():
 
     binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
 
-    uris = ['uri %s' % args.ldap_uri]
+    uris = [args.ldap_uri]
     for uri in args.ldaps:
-        uris.append('uri %s' % uri)
+        uris.append(uri)
 
-    curls = ['curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}&aws_instance_id=${aws_instance_id}" 2>/dev/null' % args.api_url]
+    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    curls = [base_curl % args.api_url]
     for api in args.apis:
-        apis.append('curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}&aws_instance_id=${aws_instance_id}" 2>/dev/null' % api)
-
-    seperator = ' || '
+        curls.append(base_curl % api)
 
     apt_get_update()
     install_dependencies()
     write_foxpass_ssh_keys_script(curls, args.api_key, seperator)
-    write_nslcd_conf(uris=uris, secondary_ldap=secondary_ldap, basedn=args.base_dn,
-                     binddn=binddn, bindpw=args.bind_pw, threads=int(args.ldap_connections))
+    write_nslcd_conf(uris=uris, basedn=args.base_dn, binddn=binddn, bindpw=args.bind_pw,
+                     threads=int(args.ldap_connections))
     augment_sshd_config()
     augment_pam()
     fix_nsswitch()
@@ -85,9 +84,11 @@ def install_dependencies():
     os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
 
 
-def write_foxpass_ssh_keys_script(curls, api_key, seperator):
+def write_foxpass_ssh_keys_script(curls, api_key):
     with open('/usr/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
+            append = '&aws_instance_id=${aws_instance_id}" 2>/dev/null'
+            curls = [curl + append for curl in curls]
             contents = """\
 #!/bin/sh
 
@@ -101,6 +102,8 @@ aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-
 exit $?
 """
         else:
+            append = '" 2>/dev/null'
+            curls = [curl + append for curl in curls]
             contents = """\
 #!/bin/sh
 
@@ -113,7 +116,7 @@ if grep -q "^${user}:" /etc/passwd; then exit 1; fi
 
 exit $?
 """
-        w.write(contents % (api_key, seperator.join(curls)))
+        w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
         os.system('chmod 700 /usr/sbin/foxpass_ssh_keys.sh')
@@ -135,7 +138,7 @@ uid nslcd
 gid nslcd
 
 # The location at which the LDAP server(s) should be reachable.
-{uris}
+uri {uris}
 
 # The search base that will be used for all queries.
 base {basedn}
@@ -164,7 +167,7 @@ nss_initgroups_ignoreusers ALLLOCAL
         sslstatus='off'
         if uri.startswith('ldaps://'):
             sslstatus='on'
-        w.write(content.format(uris='\n'.join(uris), basedn=basedn, binddn=binddn,
+        w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
                                bindpw=bindpw, sslstatus=sslstatus, threads=threads))
 
 

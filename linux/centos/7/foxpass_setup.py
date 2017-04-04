@@ -37,9 +37,9 @@ def main():
     parser.add_argument('--bind-user', required=True, help='Bind User')
     parser.add_argument('--bind-pw', required=True, help='Bind Password')
     parser.add_argument('--api-key', required=True, help='API Key')
-    parser.add_argument('--ldap-uri', default='ldaps://ldap.foxpass.com', help='LDAP Server')
+    parser.add_argument('--ldap-uri', '--ldap', default='ldaps://ldap.foxpass.com', help='LDAP Server')
     parser.add_argument('--secondary-ldap', dest='ldaps', default=[], action='append', help='Secondary LDAP Server(s)')
-    parser.add_argument('--api-url', default='https://api.foxpass.com', help='API Url')
+    parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--ldap-connections', default=2, help='Number of connections to make to LDAP server.')
 
@@ -51,9 +51,14 @@ def main():
     for uri in args.ldaps:
         uris.append(uri)
 
+    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    curls = [base_curl % args.api_url]
+    for api in args.apis:
+        curls.append(base_curl % api)
+
     install_dependencies()
     write_foxpass_ssh_keys_script(args.api_url, args.api_key)
-    run_authconfig(uri, args.base_dn)
+    run_authconfig(uris, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw)
     augment_sshd_config()
     fix_sudo()
@@ -74,6 +79,8 @@ def install_dependencies():
 def write_foxpass_ssh_keys_script(api_url, api_key):
     with open('/usr/local/bin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
+            append = '&aws_instance_id=${aws_instance_id}" 2>/dev/null'
+            curls = [curl + append for curl in curls]
             contents = """\
 #!/bin/sh
 
@@ -82,11 +89,13 @@ secret="%s"
 hostname=`hostname`
 if grep -q "^${user}:" /etc/passwd; then exit 1; fi
 aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
-curl -s -m 5 -q -f "%s/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}&aws_instance_id=${aws_instance_id}" 2>/dev/null
+%s
 
 exit $?
 """
         else:
+            append = '" 2>/dev/null'
+            curls = [curl + append for curl in curls]
             contents = """\
 #!/bin/sh
 
@@ -95,7 +104,7 @@ secret="%s"
 hostname=`hostname`
 if grep -q "^${user}:" /etc/passwd; then exit 1; fi
 
-curl -s -m 5 -q -f "%s/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
+%s
 
 exit $?
 """
@@ -106,7 +115,7 @@ exit $?
 
 
 def run_authconfig(uris, base_dn):
-    cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=join(uris), base_dn=base_dn)
+    cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=','join(uris), base_dn=base_dn)
     print 'Running %s' % cmd
     os.system(cmd)
 
