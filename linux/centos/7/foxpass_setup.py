@@ -51,13 +51,8 @@ def main():
     for uri in args.ldaps:
         uris.append(uri)
 
-    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
-    curls = [base_curl % args.api_url]
-    for api in args.apis:
-        curls.append(base_curl % api)
-
     install_dependencies()
-    write_foxpass_ssh_keys_script(args.api_url, args.api_key)
+    write_foxpass_ssh_keys_script(args.api_url, args.apis, args.api_key)
     run_authconfig(uris, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw)
     augment_sshd_config()
@@ -76,7 +71,12 @@ def install_dependencies():
     os.system('yum install -y sssd authconfig')
 
 
-def write_foxpass_ssh_keys_script(api_url, api_key):
+def write_foxpass_ssh_keys_script(api_url, apis, api_key):
+    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    curls = [base_curl % api_url]
+    for api in apis:
+        curls.append(base_curl % api)
+
     with open('/usr/local/bin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}" 2>/dev/null'
