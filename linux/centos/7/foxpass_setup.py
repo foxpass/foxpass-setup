@@ -77,9 +77,9 @@ def write_foxpass_ssh_keys_script(api_url, apis, api_key):
     for api in apis:
         curls.append(base_curl % api)
 
-    with open('/usr/local/bin/foxpass_ssh_keys.sh', "w") as w:
+    with open('/usr/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
-            append = '&aws_instance_id=${aws_instance_id}" 2>/dev/null'
+            append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
             contents = """\
 #!/bin/sh
@@ -89,8 +89,8 @@ secret="%s"
 hostname=`hostname`
 if grep -q "^${user}:" /etc/passwd; then exit 1; fi
 aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
+aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 %s
-
 exit $?
 """
         else:
@@ -103,15 +103,13 @@ user="$1"
 secret="%s"
 hostname=`hostname`
 if grep -q "^${user}:" /etc/passwd; then exit 1; fi
-
 %s
-
 exit $?
 """
-        w.write(contents % (api_key, api_url))
+        w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
-        os.system('chmod 700 /usr/local/bin/foxpass_ssh_keys.sh')
+        os.system('chmod 700 /usr/sbin/foxpass_ssh_keys.sh')
 
 
 def run_authconfig(uris, base_dn):
