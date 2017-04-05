@@ -48,12 +48,14 @@ def main():
     args = parser.parse_args()
 
     binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
+    apis = [args.api_url] + args.apis
+    uris = [args.ldap_uri] + args.ldaps
 
     apt_get_update()
     install_dependencies()
-    write_foxpass_ssh_keys_script(args.api_url, args.apis, args.api_key)
-    write_nslcd_conf(uri=args.ldap_uri, ldaps=args.ldaps, basedn=args.base_dn,
-                     binddn=binddn, bindpw=args.bind_pw, threads=int(args.ldap_connections))
+    write_foxpass_ssh_keys_script(apis, args.api_key)
+    write_nslcd_conf(uri=uris, basedn=args.base_dn, binddn=binddn, bindpw=args.bind_pw,
+                     threads=int(args.ldap_connections))
     augment_sshd_config()
     augment_pam()
     fix_nsswitch()
@@ -75,13 +77,13 @@ def install_dependencies():
     os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
 
 
-def write_foxpass_ssh_keys_script(api_url, apis, api_key):
+def write_foxpass_ssh_keys_script(apis, api_key):
     base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
-    curls = [base_curl % api_url]
+    curls = []
     for api in apis:
         curls.append(base_curl % api)
 
-    with open('/usr/sbin/foxpass_ssh_keys.sh', "w") as w:
+    with open('/usr/local/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
@@ -113,14 +115,14 @@ exit $?
         w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
-        os.system('chmod 700 /usr/sbin/foxpass_ssh_keys.sh')
+        os.system('chmod 700 /usr/local/sbin/foxpass_ssh_keys.sh')
 
 
 # write nslcd.conf, with substutions
-def write_nslcd_conf(uri, ldaps, basedn, binddn, bindpw, threads):
-    uris = [uri]
-    for ldap in ldaps:
-        uris.append(ldap)
+def write_nslcd_conf(uris, basedn, binddn, bindpw, threads):
+    ldaps = []
+    for uri in uris:
+        ldaps.append(uri)
 
     with open('/etc/nslcd.conf', "w") as w:
         content = """\
@@ -165,7 +167,7 @@ nss_initgroups_ignoreusers ALLLOCAL
         sslstatus='off'
         if uri.startswith('ldaps://'):
             sslstatus='on'
-        w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
+        w.write(content.format(uris='\nuri '.join(ldaps), basedn=basedn, binddn=binddn,
                                bindpw=bindpw, sslstatus=sslstatus, threads=threads))
 
 
@@ -173,7 +175,7 @@ def augment_sshd_config():
     if not file_contains('/etc/ssh/sshd_config', 'AuthorizedKeysCommand'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
-            w.write("AuthorizedKeysCommand\t\t/usr/sbin/foxpass_ssh_keys.sh\n")
+            w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
             w.write("AuthorizedKeysCommandUser\troot\n")
 
 

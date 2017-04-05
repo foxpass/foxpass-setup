@@ -46,13 +46,11 @@ def main():
     args = parser.parse_args()
 
     bind_dn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
-
-    uris = [args.ldap_uri]
-    for uri in args.ldaps:
-        uris.append(uri)
+    apis = [args.api_url] + args.apis
+    uris = [args.ldap_uri] + args.ldaps
 
     install_dependencies()
-    write_foxpass_ssh_keys_script(args.api_url, args.apis, args.api_key)
+    write_foxpass_ssh_keys_script(apis, args.api_key)
     run_authconfig(uris, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw)
     augment_sshd_config()
@@ -71,13 +69,13 @@ def install_dependencies():
     os.system('yum install -y sssd authconfig')
 
 
-def write_foxpass_ssh_keys_script(api_url, apis, api_key):
+def write_foxpass_ssh_keys_script(apis, api_key):
     base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
-    curls = [base_curl % api_url]
+    curls = []
     for api in apis:
         curls.append(base_curl % api)
 
-    with open('/usr/sbin/foxpass_ssh_keys.sh', "w") as w:
+    with open('/usr/local/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
@@ -109,7 +107,7 @@ exit $?
         w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
-        os.system('chmod 700 /usr/sbin/foxpass_ssh_keys.sh')
+        os.system('chmod 700 /usr/local/sbin/foxpass_ssh_keys.sh')
 
 
 def run_authconfig(uris, base_dn):
@@ -143,7 +141,7 @@ def augment_sshd_config():
     if not file_contains('/etc/ssh/sshd_config', '^AuthorizedKeysCommand'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
-            w.write("AuthorizedKeysCommand\t\t/usr/local/bin/foxpass_ssh_keys.sh\n")
+            w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
             w.write("AuthorizedKeysCommandUser\troot\n")
 
 
