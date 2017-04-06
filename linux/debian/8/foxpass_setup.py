@@ -43,7 +43,7 @@ def main():
     parser.add_argument('--secondary-ldap', dest='ldaps', default=[], action='append', help='Secondary LDAP Server(s)')
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
-    parser.add_argument('--ldap-connections', default=2, help='Number of connections to make to LDAP server.')
+    parser.add_argument('--ldap-connections', default=2, type='int', help='Number of connections to make to LDAP server.')
 
     args = parser.parse_args()
 
@@ -54,8 +54,7 @@ def main():
     apt_get_update()
     install_dependencies()
     write_foxpass_ssh_keys_script(apis, args.api_key)
-    write_nslcd_conf(uri=uris, basedn=args.base_dn, binddn=binddn, bindpw=args.bind_pw,
-                     threads=int(args.ldap_connections))
+    write_nslcd_conf(uris, args.base_dn, binddn, args.bind_pw, args.ldap_connections)
     augment_sshd_config()
     augment_pam()
     fix_nsswitch()
