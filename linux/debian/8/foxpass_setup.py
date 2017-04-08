@@ -119,10 +119,6 @@ exit $?
 
 # write nslcd.conf, with substutions
 def write_nslcd_conf(uris, basedn, binddn, bindpw, threads):
-    ldaps = []
-    for uri in uris:
-        ldaps.append(uri)
-
     with open('/etc/nslcd.conf', "w") as w:
         content = """\
 # /etc/nslcd.conf
@@ -166,7 +162,7 @@ nss_initgroups_ignoreusers ALLLOCAL
         sslstatus='off'
         if uri.startswith('ldaps://'):
             sslstatus='on'
-        w.write(content.format(uris='\nuri '.join(ldaps), basedn=basedn, binddn=binddn,
+        w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
                                bindpw=bindpw, sslstatus=sslstatus, threads=threads))
 
 

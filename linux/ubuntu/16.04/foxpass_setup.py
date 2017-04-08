@@ -40,19 +40,22 @@ def main():
     parser.add_argument('--bind-user', required=True, help='Bind User')
     parser.add_argument('--bind-pw', required=True, help='Bind Password')
     parser.add_argument('--api-key', required=True, help='API Key')
-    parser.add_argument('--ldap-uri', default='ldaps://ldap.foxpass.com', help='LDAP Server')
-    parser.add_argument('--api-url', default='https://api.foxpass.com', help='API Url')
-    parser.add_argument('--ldap-connections', default=2, help='Number of connections to make to LDAP server.')
+    parser.add_argument('--ldap-uri', '--ldap', default='ldaps://ldap.foxpass.com', help='LDAP Server')
+    parser.add_argument('--secondary-ldap', dest='ldaps', default=[], action='append', help='Secondary LDAP Server(s)')
+    parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
+    parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
+    parser.add_argument('--ldap-connections', default=2, type='int', help='Number of connections to make to LDAP server.')
 
     args = parser.parse_args()
 
     binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
+    apis = [args.api_url] + args.apis
+    uris = [args.ldap_uri] + args.ldaps
 
     apt_get_update()
     install_dependencies()
-    write_foxpass_ssh_keys_script(args.api_url, args.api_key)
-    write_nslcd_conf(uri=args.ldap_uri, basedn=args.base_dn, binddn=binddn, bindpw=args.bind_pw,
-                     threads=int(args.ldap_connections))
+    write_foxpass_ssh_keys_script(apis, args.api_key)
+    write_nslcd_conf(uris, args.base_dn, binddn, args.bind_pw, args.ldap_connections)
     augment_sshd_config()
     augment_pam()
     fix_nsswitch()
@@ -86,9 +89,16 @@ def install_dependencies():
         sys.exit(return_code >> 8)
 
 
-def write_foxpass_ssh_keys_script(api_url, api_key):
-    with open('/usr/local/bin/foxpass_ssh_keys.sh', "w") as w:
+def write_foxpass_ssh_keys_script(apis, api_key):
+    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    curls = []
+    for api in apis:
+        curls.append(base_curl % api)
+
+    with open('/usr/local/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
+            append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
+            curls = [curl + append for curl in curls]
             contents = """\
 #!/bin/sh
 
@@ -97,11 +107,13 @@ secret="%s"
 hostname=`hostname`
 if grep -q "^${user}:" /etc/passwd; then exit 1; fi
 aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
-curl -s -q -m 5 -f "%s/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}&aws_instance_id=${aws_instance_id}" 2>/dev/null
-
+aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+%s
 exit $?
 """
         else:
+            append = '" 2>/dev/null'
+            curls = [curl + append for curl in curls]
             contents = """\
 #!/bin/sh
 
@@ -109,19 +121,17 @@ user="$1"
 secret="%s"
 hostname=`hostname`
 if grep -q "^${user}:" /etc/passwd; then exit 1; fi
-
-curl -s -q -m 5 -f "%s/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
-
+%s
 exit $?
 """
-        w.write(contents % (api_key, api_url))
+        w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
-        os.system('chmod 700 /usr/local/bin/foxpass_ssh_keys.sh')
+        os.system('chmod 700 /usr/local/sbin/foxpass_ssh_keys.sh')
 
 
 # write nslcd.conf, with substutions
-def write_nslcd_conf(uri, basedn, binddn, bindpw, threads):
+def write_nslcd_conf(uris, basedn, binddn, bindpw, threads):
     with open('/etc/nslcd.conf', "w") as w:
         content = """\
 # /etc/nslcd.conf
@@ -136,7 +146,7 @@ uid nslcd
 gid nslcd
 
 # The location at which the LDAP server(s) should be reachable.
-uri {uri}
+uri {uris}
 
 # The search base that will be used for all queries.
 base {basedn}
@@ -165,8 +175,8 @@ nss_initgroups_ignoreusers ALLLOCAL
         sslstatus='off'
         if uri.startswith('ldaps://'):
             sslstatus='on'
-        w.write(content.format(uri=uri, basedn=basedn, binddn=binddn, bindpw=bindpw,
-                               sslstatus=sslstatus, threads=threads))
+        w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
+                               bindpw=bindpw, sslstatus=sslstatus, threads=threads))
 
 
 def augment_sshd_config():
