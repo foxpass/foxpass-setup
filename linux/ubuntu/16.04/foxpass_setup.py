@@ -173,7 +173,7 @@ tls_cacertfile /etc/ssl/certs/ca-certificates.crt
 nss_initgroups_ignoreusers ALLLOCAL
 """
         sslstatus='off'
-        if uirs[0].startswith('ldaps://'):
+        if uris[0].startswith('ldaps://'):
             sslstatus='on'
         w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
                                bindpw=bindpw, sslstatus=sslstatus, threads=threads))
