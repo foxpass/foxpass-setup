@@ -44,7 +44,7 @@ def main():
     parser.add_argument('--secondary-ldap', dest='ldaps', default=[], action='append', help='Secondary LDAP Server(s)')
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
-    parser.add_argument('--ldap-connections', default=2, type='int', help='Number of connections to make to LDAP server.')
+    parser.add_argument('--ldap-connections', default=2, type=int, help='Number of connections to make to LDAP server.')
 
     args = parser.parse_args()
 
