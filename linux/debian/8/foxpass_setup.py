@@ -82,7 +82,7 @@ def write_foxpass_ssh_keys_script(apis, api_key):
     for api in apis:
         curls.append(base_curl % api)
 
-    with open('/usr/local/sbin/foxpass_ssh_keys.sh', "w") as w:
+    with open('/usr/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
@@ -114,7 +114,7 @@ exit $?
         w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
-        os.system('chmod 700 /usr/local/sbin/foxpass_ssh_keys.sh')
+        os.system('chmod 700 /usr/sbin/foxpass_ssh_keys.sh')
 
 
 # write nslcd.conf, with substutions
@@ -170,7 +170,7 @@ def augment_sshd_config():
     if not file_contains('/etc/ssh/sshd_config', 'AuthorizedKeysCommand'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
-            w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
+            w.write("AuthorizedKeysCommand\t\t/usr/sbin/foxpass_ssh_keys.sh\n")
             w.write("AuthorizedKeysCommandUser\troot\n")
 
 
