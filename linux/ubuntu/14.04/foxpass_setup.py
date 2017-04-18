@@ -40,6 +40,7 @@ def main():
     parser.add_argument('--bind-user', required=True, help='Bind User')
     parser.add_argument('--bind-pw', required=True, help='Bind Password')
     parser.add_argument('--api-key', required=True, help='API Key')
+    parser.add_argument('--ldap-uri', '--ldap', default='ldaps://ldap.foxpass.com', help='LDAP Server')
     parser.add_argument('--secondary-ldap', dest='ldaps', default=[], action='append', help='Secondary LDAP Server(s)')
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
