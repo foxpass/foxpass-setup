@@ -51,6 +51,7 @@ def main():
     apis = [args.api_url] + args.apis
     uris = [args.ldap_uri] + args.ldaps
 
+    add_repo()
     apt_get_update()
     install_dependencies()
     write_foxpass_ssh_keys_script(apis, args.api_key)
@@ -60,6 +61,9 @@ def main():
     fix_nsswitch()
     fix_sudo()
     restart()
+
+def add_repo():
+    os.system('add-apt-repository -y ppa:natecarlson/precisebackports')
 
 def apt_get_update():
     os.system('apt-get update')
