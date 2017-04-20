@@ -168,6 +168,9 @@ nss_initgroups_ignoreusers ALLLOCAL
         w.write(content.format(uri=uri, basedn=basedn, binddn=binddn, bindpw=bindpw,
                                sslstatus=sslstatus, threads=threads))
 
+        # give permissions only to root to protect the LDAP secret (also because nslcd won't start with unsafe permissions)
+        os.system('chmod 600 /etc/nslcd.conf')
+
 
 def augment_sshd_config():
     if not file_contains('/etc/ssh/sshd_config', 'AuthorizedKeysCommand'):
