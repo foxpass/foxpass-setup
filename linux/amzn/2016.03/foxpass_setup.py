@@ -114,7 +114,7 @@ def run_authconfig(uri, base_dn):
     os.system(cmd)
 
 
-def configure_sssd(bind_dn, bind_pw):
+def configure_sssd(bind_dn, bind_pw, backup_ldaps):
     from SSSDConfig import SSSDConfig
 
     sssdconfig = SSSDConfig()
