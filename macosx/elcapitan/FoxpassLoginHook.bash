@@ -1,6 +1,6 @@
 #!/bin/bash
 LOGFILE=/var/log/loginhook.log
-echo "$(date) Login hook exected for user $1" >> $LOGFILE
+echo "$(date) Login hook executed for user $1" >> $LOGFILE
 
 if [ ! -z "$1" ] && [ "_mbsetupuser" != "$1" ] && [ ! -d /Users/$1 ]; then
   echo "$(date) Adding user $1" >> $LOGFILE
