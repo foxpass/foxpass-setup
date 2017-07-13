@@ -192,7 +192,7 @@ def fix_nsswitch():
 
 # give "sudo" group sudo permissions without password
 def fix_sudo():
-    os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
+    os.system("echo '# Adding Foxpass group to sudoers\n%foxpass ALL=(ALL:ALL) NOPASSWD:ALL' >> /etc/sudoers")
 
 def restart():
     # restart nslcd, nscd, ssh
