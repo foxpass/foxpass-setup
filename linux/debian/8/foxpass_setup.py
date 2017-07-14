@@ -24,9 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# USAGE: sudo ./foxpass_setup.sh dc=example,dc=com <binder_name> <binder_pw> <api_key>
-#  e.g.: sudo ./foxpass_setup.sh dc=foxpass,dc=com linux <password> <long_api_key_here>
-
 import argparse
 from datetime import datetime
 import os
@@ -192,6 +189,7 @@ def fix_nsswitch():
 
 # give "sudo" group sudo permissions without password
 def fix_sudo():
+    os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
     if not file_contains('/etc/sudoers', 'foxpass-sudo'):
         with open('/etc/sudoers', "a") as w:
             w.write('# Adding Foxpass group to sudoers\n%foxpass-sudo ALL=(ALL:ALL) NOPASSWD:ALL')
