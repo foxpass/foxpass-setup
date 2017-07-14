@@ -200,7 +200,7 @@ def fix_nsswitch():
     os.system("sed -i 's/group:.*/group:          compat ldap/' /etc/nsswitch.conf")
     os.system("sed -i 's/shadow:.*/shadow:         compat ldap/' /etc/nsswitch.conf")
 
-# give "sudo" group sudo permissions without password
+# give "sudo" and "foxpass-sudo" groups sudo permissions without password
 def fix_sudo():
     os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
     if not file_contains('/etc/sudoers', 'foxpass-sudo'):
