@@ -64,6 +64,7 @@ def main():
 
 def install_dependencies():
     # install dependencies
+    os.system('yum update -y krb5-libs')
     os.system('yum install -y sssd authconfig')
 
 
@@ -134,6 +135,8 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
 
     sssdconfig.save_domain(domain)
     sssdconfig.write()
+    if file_contains('/etc/sssd/sssd.conf', 'krb'):
+        os.system("sed -i 's/krb.*//' /etc/sssd/sssd.conf")
 
 
 def augment_sshd_config():
