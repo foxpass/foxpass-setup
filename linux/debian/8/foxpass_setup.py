@@ -28,6 +28,7 @@ import argparse
 from datetime import datetime
 import os
 import sys
+import time
 import urllib3
 
 def main():
@@ -56,6 +57,12 @@ def main():
     augment_pam()
     fix_nsswitch()
     fix_sudo()
+
+    # sleep to the next second to make sure sssd.conf has a new timestamp
+    time.sleep(1)
+    # touch the sssd conf file again
+    os.system('touch /etc/sssd/sssd.conf')
+    
     restart()
 
 
