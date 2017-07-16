@@ -64,6 +64,7 @@ def main():
 
 def install_dependencies():
     # install dependencies
+    os.system('yum update -y krb5-libs')
     os.system('yum install -y sssd authconfig')
 
 
@@ -122,7 +123,7 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
 
     domain = sssdconfig.get_domain('default')
     domain.add_provider('ldap', 'id')
-    domain.set_option('ldap_backup_uri', ','.join(backup_ldaps))
+    if backup_ldaps: domain.set_option('ldap_backup_uri', ','.join(backup_ldaps))
     domain.set_option('ldap_tls_reqcert', 'demand')
     domain.set_option('ldap_tls_cacert', '/etc/ssl/certs/ca-bundle.crt')
     domain.set_option('ldap_default_bind_dn', bind_dn)
