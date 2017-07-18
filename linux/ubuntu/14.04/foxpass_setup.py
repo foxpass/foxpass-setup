@@ -209,7 +209,8 @@ def fix_sudo():
     if not os.path.isfile('/etc/sudoers.d/95-foxpass-sudo'):
         with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
             w.write('# Adding Foxpass group to sudoers\n%foxpass-sudo ALL=(ALL:ALL) NOPASSWD:ALL')
-            
+        os.system("chmod 440 /etc/sudoers.d/95-foxpass-sudo")
+        
 def restart():
     # restart nslcd, nscd, ssh
     os.system("service nslcd restart")
