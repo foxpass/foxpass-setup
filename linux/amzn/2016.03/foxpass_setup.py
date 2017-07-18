@@ -122,7 +122,7 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
 
     domain = sssdconfig.get_domain('default')
     domain.add_provider('ldap', 'id')
-    if backup_ldaps: domain.set_option('ldap_backup_uri', ','.join(backup_ldaps))
+    domain.set_option('ldap_backup_uri', ','.join(backup_ldaps))
     domain.set_option('ldap_tls_reqcert', 'demand')
     domain.set_option('ldap_tls_cacert', '/etc/ssl/certs/ca-bundle.crt')
     domain.set_option('ldap_default_bind_dn', bind_dn)
@@ -144,12 +144,9 @@ def augment_sshd_config():
             w.write("AuthorizedKeysCommandUser\troot\n")
 
 
-# give "wheel" and "foxpass-sudo" groups sudo permissions without password
+# give "wheel" group sudo permissions without password
 def fix_sudo():
     os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
-    if not file_contains('/etc/sudoers', 'foxpass-sudo'):
-        with open('/etc/sudoers', "a") as w:
-            w.write('# Adding Foxpass group to sudoers\n%foxpass-sudo ALL=(ALL:ALL) NOPASSWD:ALL')
 
 def restart():
     os.system("service sssd restart")
