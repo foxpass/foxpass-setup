@@ -202,11 +202,14 @@ def fix_nsswitch():
 
 # give "sudo" and "foxpass-sudo" groups sudo permissions without password
 def fix_sudo():
-    os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
-    if not file_contains('/etc/sudoers', 'foxpass-sudo'):
-        with open('/etc/sudoers', "a") as w:
+    os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
+    if not file_contains('/etc/sudoers', '^#includedir'):
+        with open('/etc/sudoers', 'a') as w:
+            w.write('\n#includedir /etc/sudoers.d')
+    if not os.path.isfile('/etc/sudoers.d/95-foxpass-sudo'):
+        with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
             w.write('# Adding Foxpass group to sudoers\n%foxpass-sudo ALL=(ALL:ALL) NOPASSWD:ALL')
-
+            
 def restart():
     # restart nslcd, nscd, ssh
     os.system("service nslcd restart")
