@@ -150,9 +150,9 @@ def fix_sudo():
     if not file_contains('/etc/sudoers', '^#includedir'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d')
-    if not os.path.isdir('/etc/sudoers.d'):
+    if not os.path.exists('/etc/sudoers.d'):
         os.system('mkdir /etc/sudoers.d && chmod 750 /etc/sudoers.d')
-    if not os.path.isfile('/etc/sudoers.d/95-foxpass-sudo'):
+    if not os.path.exists('/etc/sudoers.d/95-foxpass-sudo'):
         with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
             w.write('# Adding Foxpass group to sudoers\n%foxpass-sudo ALL=(ALL:ALL) NOPASSWD:ALL')
         os.system("chmod 440 /etc/sudoers.d/95-foxpass-sudo")
