@@ -63,7 +63,7 @@ def main():
 def apt_get_update():
     # This section requires that the update-notifier package be installed.
     update_notifier_file = '/var/lib/apt/periodic/update-success-stamp'
-    notifier_file_exists = os.path.isfile(update_notifier_file)
+    notifier_file_exists = os.path.exists(update_notifier_file)
 
     if not notifier_file_exists:
         # No way to check last apt-get update, so we always run.
@@ -202,10 +202,16 @@ def fix_nsswitch():
 
 # give "sudo" and "foxpass-sudo" groups sudo permissions without password
 def fix_sudo():
-    os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
-    if not file_contains('/etc/sudoers', 'foxpass-sudo'):
-        with open('/etc/sudoers', "a") as w:
+    os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
+    if not file_contains('/etc/sudoers', '\n#includedir'):
+        with open('/etc/sudoers', 'a') as w:
+            w.write('\n#includedir /etc/sudoers.d\n')
+    if not os.path.exists('/etc/sudoers.d'):
+        os.system('mkdir /etc/sudoers.d && chmod 750 /etc/sudoers.d')
+    if not os.path.exists('/etc/sudoers.d/95-foxpass-sudo'):
+        with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
             w.write('# Adding Foxpass group to sudoers\n%foxpass-sudo ALL=(ALL:ALL) NOPASSWD:ALL')
+        os.system("chmod 440 /etc/sudoers.d/95-foxpass-sudo")
 
 def restart():
     # restart nslcd, nscd, ssh
