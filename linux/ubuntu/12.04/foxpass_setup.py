@@ -191,7 +191,7 @@ def fix_nsswitch():
 
 # give "sudo" and "foxpass-sudo" groups sudo permissions without password
 def fix_sudo():
-    os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
+    os.system("sed -i 's/^# %sudo\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
     if not file_contains('/etc/sudoers', '\n#includedir'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d\n')
