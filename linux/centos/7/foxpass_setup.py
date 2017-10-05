@@ -141,7 +141,7 @@ def augment_sshd_config():
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
             w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
-            w.write("AuthorizedKeysCommandRunAs\troot\n")
+            w.write("AuthorizedKeysCommandRun\troot\n")
 
 
 # give "wheel" and "foxpass-sudo" groups sudo permissions without password
