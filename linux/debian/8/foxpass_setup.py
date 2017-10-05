@@ -126,6 +126,11 @@ def write_nslcd_conf(uris, basedn, binddn, bindpw, threads):
 # number of threads. one LDAP connction per thread.
 threads {threads}
 
+# Idle Timeout so we don't keep unused connections open foever
+# default ncsd is 600s, we'll do 24h to keep active sessions
+# available.
+idle_timelimit 86400
+
 # The user and group nslcd should run as.
 uid nslcd
 gid nslcd
