@@ -42,6 +42,7 @@ def main():
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--ldap-connections', default=2, type=int, help='Number of connections to make to LDAP server.')
+    parser.add_argument('--idle_timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
 
     args = parser.parse_args()
 
@@ -52,7 +53,7 @@ def main():
     apt_get_update()
     install_dependencies()
     write_foxpass_ssh_keys_script(apis, args.api_key)
-    write_nslcd_conf(uris, args.base_dn, binddn, args.bind_pw, args.ldap_connections)
+    write_nslcd_conf(uris, args.base_dn, binddn, args.bind_pw, args.ldap_connections, args.idle_timelimit)
     augment_sshd_config()
     augment_pam()
     fix_nsswitch()
@@ -116,7 +117,7 @@ exit $?
 
 
 # write nslcd.conf, with substutions
-def write_nslcd_conf(uris, basedn, binddn, bindpw, threads):
+def write_nslcd_conf(uris, basedn, binddn, bindpw, threads, idle_timelimit):
     with open('/etc/nslcd.conf', "w") as w:
         content = """\
 # /etc/nslcd.conf
@@ -129,7 +130,7 @@ threads {threads}
 # Idle Timeout so we don't keep unused connections open foever
 # default ncsd is 600s, we'll do 24h to keep active sessions
 # available.
-idle_timelimit 86400
+idle_timelimit {idle_timelimit}
 
 # The user and group nslcd should run as.
 uid nslcd
@@ -166,7 +167,7 @@ nss_initgroups_ignoreusers ALLLOCAL
         if uris[0].startswith('ldaps://'):
             sslstatus='on'
         w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
-                               bindpw=bindpw, sslstatus=sslstatus, threads=threads))
+                               bindpw=bindpw, sslstatus=sslstatus, threads=threads, idle_timelimit=idle_timelimit))
 
 
 def augment_sshd_config():

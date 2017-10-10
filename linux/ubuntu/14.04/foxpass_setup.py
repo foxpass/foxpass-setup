@@ -128,7 +128,7 @@ exit $?
 
 
 # write nslcd.conf, with substutions
-def write_nslcd_conf(uris, basedn, binddn, bindpw, threads):
+def write_nslcd_conf(uris, basedn, binddn, bindpw, threads, idle_timelimit):
     with open('/etc/nslcd.conf', "w") as w:
         content = """\
 # /etc/nslcd.conf
@@ -141,7 +141,7 @@ threads {threads}
 # Idle Timeout so we don't keep unused connections open foever
 # default ncsd is 600s, we'll do 24h to keep active sessions
 # available.
-idle_timelimit 86400
+idle_timelimit {idle_timelimit}
 
 # The user and group nslcd should run as.
 uid nslcd
@@ -178,7 +178,7 @@ nss_initgroups_ignoreusers ALLLOCAL
         if uris[0].startswith('ldaps://'):
             sslstatus='on'
         w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
-                               bindpw=bindpw, sslstatus=sslstatus, threads=threads))
+                               bindpw=bindpw, sslstatus=sslstatus, threads=threads, idle_timelimit=idle_timelimit))
 
 
 def augment_sshd_config():
