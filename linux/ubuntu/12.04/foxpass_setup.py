@@ -41,7 +41,7 @@ def main():
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--ldap-connections', default=2, type=int, help='Number of connections to make to LDAP server.')
-    parser.add_argument('--idle_timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
+    parser.add_argument('--idle-timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
 
     args = parser.parse_args()
 
@@ -128,9 +128,8 @@ def write_nslcd_conf(uris, basedn, binddn, bindpw, threads, idle_timelimit):
 # number of threads. one LDAP connction per thread.
 threads {threads}
 
-# Idle Timeout so we don't keep unused connections open foever
-# default ncsd is 600s, we'll do 24h to keep active sessions
-# available.
+# Set how long to keep ldap connections to foxpass open.
+# Default is 600s
 idle_timelimit {idle_timelimit}
 
 # The user and group nslcd should run as.
