@@ -129,7 +129,7 @@ def write_nslcd_conf(uris, basedn, binddn, bindpw, threads, idle_timelimit):
 threads {threads}
 
 # Set how long to keep ldap connections to foxpass open.
-# Default is 600s
+# By default Foxpass sets this to 600s.
 idle_timelimit {idle_timelimit}
 
 # The user and group nslcd should run as.
