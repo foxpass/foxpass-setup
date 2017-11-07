@@ -41,6 +41,7 @@ def main():
     parser.add_argument('--secondary-ldap', dest='ldaps', default=[], action='append', help='Secondary LDAP Server(s)')
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
+    parser.add_argument('--sudoers', default='foxpass-sudo', type=str, help='sudoers group with root access')
 
     args = parser.parse_args()
 
@@ -144,7 +145,7 @@ def augment_sshd_config():
             w.write("AuthorizedKeysCommandUser\troot\n")
 
 
-# give "wheel" and "foxpass-sudo" groups sudo permissions without password
+# give "sudo" and chosen sudoers groups sudo permissions without password
 def fix_sudo():
     os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
     if not file_contains('/etc/sudoers', '^#includedir'):
@@ -152,10 +153,10 @@ def fix_sudo():
             w.write('\n#includedir /etc/sudoers.d\n')
     if not os.path.exists('/etc/sudoers.d'):
         os.system('mkdir /etc/sudoers.d && chmod 750 /etc/sudoers.d')
-    if not os.path.exists('/etc/sudoers.d/95-foxpass-sudo'):
-        with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
-            w.write('# Adding Foxpass group to sudoers\n%foxpass-sudo ALL=(ALL:ALL) NOPASSWD:ALL')
-        os.system("chmod 440 /etc/sudoers.d/95-foxpass-sudo")
+    if not os.path.exists('/etc/sudoers.d/95-{sudo}'.format(sudo=args.sudoers)):
+        with open('/etc/sudoers.d/95-{sudo}'.format(sudo=args.sudoers), 'w') as w:
+            w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL) NOPASSWD:ALL'.format(sudo=args.sudoers))
+        os.system('chmod 440 /etc/sudoers.d/95-{sudo}'.format(sudo=args.sudoers))
 
 
 
