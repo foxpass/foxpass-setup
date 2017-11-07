@@ -53,7 +53,7 @@ def main():
     run_authconfig(args.ldap_uri, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw, args.ldaps)
     augment_sshd_config()
-    fix_sudo()
+    fix_sudo(args.sudoers)
 
     # sleep to the next second to make sure sssd.conf has a new timestamp
     time.sleep(1)
@@ -146,17 +146,17 @@ def augment_sshd_config():
 
 
 # give "sudo" and chosen sudoers groups sudo permissions without password
-def fix_sudo():
+def fix_sudo(sudoers):
     os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
     if not file_contains('/etc/sudoers', '^#includedir'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d\n')
     if not os.path.exists('/etc/sudoers.d'):
         os.system('mkdir /etc/sudoers.d && chmod 750 /etc/sudoers.d')
-    if not os.path.exists('/etc/sudoers.d/95-{sudo}'.format(sudo=args.sudoers)):
-        with open('/etc/sudoers.d/95-{sudo}'.format(sudo=args.sudoers), 'w') as w:
-            w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL) NOPASSWD:ALL'.format(sudo=args.sudoers))
-        os.system('chmod 440 /etc/sudoers.d/95-{sudo}'.format(sudo=args.sudoers))
+    if not os.path.exists('/etc/sudoers.d/95-{sudo}'.format(sudo=sudoers)):
+        with open('/etc/sudoers.d/95-{sudo}'.format(sudo=sudoers), 'w') as w:
+            w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL) NOPASSWD:ALL'.format(sudo=sudoers))
+        os.system('chmod 440 /etc/sudoers.d/95-{sudo}'.format(sudo=sudoers))
 
 
 
