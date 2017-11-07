@@ -41,7 +41,7 @@ def main():
     parser.add_argument('--secondary-ldap', dest='ldaps', default=[], action='append', help='Secondary LDAP Server(s)')
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
-    parser.add_argument('--sudoers', default='foxpass-sudo', type=str, help='sudoers group with root access')
+    parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
 
     args = parser.parse_args()
 
@@ -53,7 +53,7 @@ def main():
     run_authconfig(args.ldap_uri, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw, args.ldaps)
     augment_sshd_config()
-    fix_sudo(args.sudoers)
+    fix_sudo(args.sudoers-group)
 
     # sleep to the next second to make sure sssd.conf has a new timestamp
     time.sleep(1)

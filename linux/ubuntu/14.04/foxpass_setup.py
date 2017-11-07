@@ -43,7 +43,7 @@ def main():
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--ldap-connections', default=2, type=int, help='Number of connections to make to LDAP server.')
     parser.add_argument('--idle-timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
-    parser.add_argument('--sudoers', default='foxpass-sudo', type=str, help='sudoers group with root access')
+    parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
 
     args = parser.parse_args()
 
@@ -58,7 +58,7 @@ def main():
     augment_sshd_config()
     augment_pam()
     fix_nsswitch()
-    fix_sudo(args.sudoers)
+    fix_sudo(args.sudoers-group)
     restart()
 
 
