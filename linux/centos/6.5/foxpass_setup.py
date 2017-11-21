@@ -145,7 +145,7 @@ def augment_sshd_config():
             w.write("AuthorizedKeysCommandRunAs\troot\n")
 
 
-# give "sudo" and chosen sudoers groups sudo permissions without password
+# give "wheel" and chosen sudoers groups sudo permissions without password
 def fix_sudo(sudoers):
     os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
     if not file_contains('/etc/sudoers', '^#includedir'):
