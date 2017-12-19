@@ -28,6 +28,7 @@ import argparse
 from datetime import datetime
 import os
 import os.path
+import re
 import sys
 import urllib3
 
@@ -183,7 +184,7 @@ nss_initgroups_ignoreusers ALLLOCAL
 
 
 def augment_sshd_config():
-    if not file_contains('/etc/ssh/sshd_config', '\nAuthorizedKeysCommand'):
+    if not file_contains('/etc/ssh/sshd_config', '^AuthorizedKeysCommand'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
             w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
@@ -209,7 +210,7 @@ def fix_nsswitch():
 # give "sudo" and chosen sudoers groups sudo permissions without password
 def fix_sudo(sudoers):
     os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
-    if not file_contains('/etc/sudoers', '\n#includedir'):
+    if not file_contains('/etc/sudoers', '^#includedir'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d\n')
     if not os.path.exists('/etc/sudoers.d'):
@@ -226,8 +227,11 @@ def restart():
     os.system("service ssh restart")
 
 def file_contains(filename, content):
-    with open(filename) as r:
-        return content in r.read()
+    with open(filename) as f:
+        for line in f:
+            if re.match(r'' + content, line):
+                return True
+    return False
 
 def is_ec2_host():
     http = urllib3.PoolManager(timeout=.1)
