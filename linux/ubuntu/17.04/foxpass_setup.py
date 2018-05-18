@@ -33,6 +33,7 @@ import urllib3
 
 from datetime import datetime
 
+
 def main():
     parser = argparse.ArgumentParser(description='Set up Foxpass on a linux host.')
     parser.add_argument('--base-dn', required=True, help='Base DN')
@@ -46,7 +47,9 @@ def main():
     parser.add_argument('--ldap-connections', default=2, type=int, help='Number of connections to make to LDAP server.')
     parser.add_argument('--idle-timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
-    parser.add_argument('--require-sudoers-pw', default=False, type=bool,
+    parser.add_argument('--require-sudoers-pw',
+                        default=False,
+                        action='store_true',
                         help='set sudoers default password requirement')
 
     args = parser.parse_args()
@@ -221,7 +224,7 @@ def fix_sudo(sudoers, require_sudoers_pw):
         with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
             w.write('# Adding Foxpass group to sudoers\n\
             %{sudo} ALL=(ALL:ALL){nopasswd}'.format(sudo=sudoers,
-                                                    nopasswd='NOPASSWD:ALL' if not require_sudoers_pw else ''))
+                                                    nopasswd='NOPASSWD:ALL' if not require_sudoers_pw else 'ALL'))
     if not require_sudoers_pw:
         os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
 
