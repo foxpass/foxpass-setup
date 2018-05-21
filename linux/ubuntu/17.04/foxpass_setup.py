@@ -249,7 +249,7 @@ def is_ec2_host():
     try:
         r = http.request('GET', url)
         return True
-    except:
+    except Exception:
         return False
 
 
