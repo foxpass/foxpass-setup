@@ -25,12 +25,11 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+from datetime import datetime
 import os
 import re
 import sys
 import urllib3
-
-from datetime import datetime
 
 
 def main():
