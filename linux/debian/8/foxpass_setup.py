@@ -27,9 +27,11 @@
 import argparse
 from datetime import datetime
 import os
+import re
 import sys
 import time
 import urllib3
+
 
 def main():
     parser = argparse.ArgumentParser(description='Set up Foxpass on a linux host.')
@@ -44,6 +46,10 @@ def main():
     parser.add_argument('--ldap-connections', default=2, type=int, help='Number of connections to make to LDAP server.')
     parser.add_argument('--idle-timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
+    parser.add_argument('--require-sudoers-pw',
+                        default=False,
+                        action='store_true',
+                        help='set sudoers default password requirement')
 
     args = parser.parse_args()
 
@@ -63,9 +69,9 @@ def main():
 
 
 def apt_get_update():
-    now=datetime.now()
-    apt_cache_age=datetime.fromtimestamp(os.stat('/var/cache/apt').st_mtime)
-    delta = now-apt_cache_age
+    now = datetime.now()
+    apt_cache_age = datetime.fromtimestamp(os.stat('/var/cache/apt').st_mtime)
+    delta = now - apt_cache_age
 
     if delta.days > 7:
         os.system('apt-get update')
@@ -163,9 +169,9 @@ tls_cacertfile /etc/ssl/certs/ca-certificates.crt
 # don't use LDAP for any users defined in /etc/passwd
 nss_initgroups_ignoreusers ALLLOCAL
 """
-        sslstatus='off'
+        sslstatus = 'off'
         if uris[0].startswith('ldaps://'):
-            sslstatus='on'
+            sslstatus = 'on'
         w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
                                bindpw=bindpw, sslstatus=sslstatus, threads=threads, idle_timelimit=idle_timelimit))
 
@@ -180,13 +186,12 @@ def augment_sshd_config():
 
 def augment_pam():
     if not file_contains('/etc/pam.d/common-session', 'pam_mkhomedir.so'):
-         with open('/etc/pam.d/common-session', "a") as w:
-             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
+        with open('/etc/pam.d/common-session', "a") as w:
+            w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
 
     if not file_contains('/etc/pam.d/common-session-noninteractive', 'pam_mkhomedir.so'):
-         with open('/etc/pam.d/common-session-noninteractive', "a") as w:
-             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
-
+        with open('/etc/pam.d/common-session-noninteractive', "a") as w:
+            w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
 
 
 def fix_nsswitch():
@@ -194,18 +199,22 @@ def fix_nsswitch():
     os.system("sed -i 's/group:.*/group:          compat ldap/' /etc/nsswitch.conf")
     os.system("sed -i 's/shadow:.*/shadow:         compat ldap/' /etc/nsswitch.conf")
 
+
 # give "sudo" and chosen sudoers groups sudo permissions without password
-def fix_sudo(sudoers):
-    os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
-    if not file_contains('/etc/sudoers', '\n#includedir'):
+def fix_sudo(sudoers, require_sudoers_pw):
+    if not file_contains('/etc/sudoers', 'r"^#includedir"'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d\n')
     if not os.path.exists('/etc/sudoers.d'):
         os.system('mkdir /etc/sudoers.d && chmod 750 /etc/sudoers.d')
     if not os.path.exists('/etc/sudoers.d/95-foxpass-sudo'):
         with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
-            w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL) NOPASSWD:ALL'.format(sudo=sudoers))
-        os.system('chmod 440 /etc/sudoers.d/95-foxpass-sudo')
+            w.write('# Adding Foxpass group to sudoers\n\
+            %{sudo} ALL=(ALL:ALL){command}'.format(sudo=sudoers,
+                                                   command='NOPASSWD:ALL' if not require_sudoers_pw else 'ALL'))
+    if not require_sudoers_pw:
+        os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
+
 
 def restart():
     # restart nslcd, nscd, ssh
@@ -213,9 +222,14 @@ def restart():
     os.system("service nscd restart")
     os.system("service ssh restart")
 
-def file_contains(filename, content):
-    with open(filename) as r:
-        return content in r.read()
+
+def file_contains(filename, pattern):
+    with open(filename) as f:
+        for line in f:
+            if re.match(pattern, line):
+                return True
+    return False
+
 
 def is_ec2_host():
     http = urllib3.PoolManager(timeout=.1)
@@ -223,8 +237,9 @@ def is_ec2_host():
     try:
         r = http.request('GET', url)
         return True
-    except:
+    except Exception:
         return False
+
 
 if __name__ == '__main__':
     main()
