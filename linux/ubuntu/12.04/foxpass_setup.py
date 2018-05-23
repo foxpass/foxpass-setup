@@ -64,7 +64,7 @@ def main():
     augment_sshd_config()
     augment_pam()
     fix_nsswitch()
-    fix_sudo(args.sudoers_group)
+    fix_sudo(args.sudoers_group, args.require_sudoers_pw)
     restart()
 
 
