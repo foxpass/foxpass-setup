@@ -188,7 +188,7 @@ nss_initgroups_ignoreusers ALLLOCAL
 
 
 def augment_sshd_config():
-    if not file_contains('/etc/ssh/sshd_config', 'AuthorizedKeysCommand'):
+    if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
             w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
@@ -196,11 +196,11 @@ def augment_sshd_config():
 
 
 def augment_pam():
-    if not file_contains('/etc/pam.d/common-session', 'pam_mkhomedir.so'):
+    if not file_contains('/etc/pam.d/common-session', r'pam_mkhomedir\.so'):
         with open('/etc/pam.d/common-session', "a") as w:
             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
 
-    if not file_contains('/etc/pam.d/common-session-noninteractive', 'pam_mkhomedir.so'):
+    if not file_contains('/etc/pam.d/common-session-noninteractive', r'pam_mkhomedir\.so'):
         with open('/etc/pam.d/common-session-noninteractive', "a") as w:
             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
 
@@ -213,7 +213,7 @@ def fix_nsswitch():
 
 # give "sudo" and chosen sudoers groups sudo permissions without password
 def fix_sudo(sudoers, require_sudoers_pw):
-    if not file_contains('/etc/sudoers', r'^#includedir'):
+    if not file_contains('/etc/sudoers', r'^#includedir /etc/sudoers.d'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d\n')
     if not os.path.exists('/etc/sudoers.d'):

@@ -145,7 +145,7 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
 
 
 def augment_sshd_config():
-    if not file_contains('/etc/ssh/sshd_config', '^AuthorizedKeysCommand'):
+    if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
             w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
@@ -172,11 +172,10 @@ def restart():
     os.system("service sshd restart")
 
 
-def file_contains(filename, regex):
-    pat = re.compile(regex)
+def file_contains(filename, pattern):
     with open(filename) as f:
         for line in f:
-            if pat.search(line):
+            if re.match(pattern, line):
                 return True
     return False
 
