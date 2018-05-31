@@ -162,10 +162,10 @@ def fix_sudo(sudoers, require_sudoers_pw):
         os.system('mkdir /etc/sudoers.d && chmod 750 /etc/sudoers.d')
     if not os.path.exists('/etc/sudoers.d/95-foxpass-sudo'):
         with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
-            w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL){command}'.
-                    format(sudo=sudoers, command='NOPASSWD:ALL' if not require_sudoers_pw else 'ALL'))
+            w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL) {command}'.
+                    format(sudo=sudoers, command='ALL' if require_sudoers_pw else 'NOPASSWD:ALL'))
     if not require_sudoers_pw:
-        os.system("sed -i 's/^%wheel\tALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
+        os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
 
 
 def restart():
