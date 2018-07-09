@@ -104,7 +104,7 @@ exit $?
 
 user="$1"
 secret="%s"
-hostname=`hostname`
+hostname=`uname -n`
 if grep -q "^${user}:" /etc/passwd; then exit; fi
 %s
 exit $?
