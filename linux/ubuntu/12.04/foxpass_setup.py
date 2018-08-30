@@ -180,7 +180,7 @@ nss_initgroups_ignoreusers ALLLOCAL
 
 
 def augment_sshd_config():
-    if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand '):
+    if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand\w'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
             w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")

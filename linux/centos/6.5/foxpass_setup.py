@@ -31,6 +31,7 @@ import sys
 import time
 import urllib3
 
+
 def main():
     parser = argparse.ArgumentParser(description='Set up Foxpass on a linux host.')
     parser.add_argument('--base-dn', required=True, help='Base DN')
@@ -123,7 +124,8 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
 
     domain = sssdconfig.get_domain('default')
     domain.add_provider('ldap', 'id')
-    if backup_ldaps: domain.set_option('ldap_backup_uri', ','.join(backup_ldaps))
+    if backup_ldaps:
+        domain.set_option('ldap_backup_uri', ','.join(backup_ldaps))
     domain.set_option('ldap_tls_reqcert', 'demand')
     domain.set_option('ldap_tls_cacert', '/etc/ssl/certs/ca-bundle.crt')
     domain.set_option('ldap_default_bind_dn', bind_dn)
@@ -138,7 +140,7 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
 
 
 def augment_sshd_config():
-    if not file_contains('/etc/ssh/sshd_config', '^AuthorizedKeysCommand'):
+    if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand\w'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
             w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
@@ -158,9 +160,11 @@ def fix_sudo(sudoers):
             w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL) NOPASSWD:ALL'.format(sudo=sudoers))
         os.system('chmod 440 /etc/sudoers.d/95-foxpass-sudo')
 
+
 def restart():
     os.system("service sssd restart")
     os.system("service sshd restart")
+
 
 def file_contains(filename, regex):
     import re
@@ -179,8 +183,9 @@ def is_ec2_host():
     try:
         r = http.request('GET', url)
         return True
-    except:
+    except Exception:
         return False
+
 
 if __name__ == '__main__':
     main()
