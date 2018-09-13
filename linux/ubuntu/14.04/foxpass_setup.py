@@ -64,7 +64,7 @@ def main():
     augment_sshd_config()
     augment_pam()
     fix_nsswitch()
-    fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoer)
+    fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
     restart()
 
 
@@ -213,13 +213,13 @@ def fix_nsswitch():
 
 
 # give "sudo" and chosen sudoers groups sudo permissions without password
-def fix_sudo(sudoers, require_sudoers_pw, update_sudoer):
+def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
     if not file_contains('/etc/sudoers', r'^#includedir /etc/sudoers.d'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d\n')
     if not os.path.exists('/etc/sudoers.d'):
         os.system('mkdir /etc/sudoers.d && chmod 750 /etc/sudoers.d')
-    if not os.path.exists('/etc/sudoers.d/95-foxpass-sudo') or update_sudoer:
+    if not os.path.exists('/etc/sudoers.d/95-foxpass-sudo') or update_sudoers:
         with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
             w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL) {command}'.
                     format(sudo=sudoers, command='ALL' if require_sudoers_pw else 'NOPASSWD:ALL'))
