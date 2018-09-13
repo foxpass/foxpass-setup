@@ -44,6 +44,7 @@ def main():
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
+    parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
     parser.add_argument('--require-sudoers-pw',
                         default=False,
                         action='store_true',
@@ -59,7 +60,7 @@ def main():
     run_authconfig(args.ldap_uri, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw, args.ldaps)
     augment_sshd_config()
-    fix_sudo(args.sudoers_group, args.require_sudoers_pw)
+    fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
 
     # sleep to the next second to make sure sssd.conf has a new timestamp
     time.sleep(1)
@@ -153,13 +154,13 @@ def augment_sshd_config():
 
 
 # give "wheel" and chosen sudoers groups sudo permissions without password
-def fix_sudo(sudoers, require_sudoers_pw):
+def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
     if not file_contains('/etc/sudoers', r'^#includedir /etc/sudoers.d'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d\n')
     if not os.path.exists('/etc/sudoers.d'):
         os.system('mkdir /etc/sudoers.d && chmod 750 /etc/sudoers.d')
-    if not os.path.exists('/etc/sudoers.d/95-foxpass-sudo'):
+    if not os.path.exists('/etc/sudoers.d/95-foxpass-sudo') or update_sudoers:
         with open('/etc/sudoers.d/95-foxpass-sudo', 'w') as w:
             w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL) {command}'.
                     format(sudo=sudoers, command='ALL' if require_sudoers_pw else 'NOPASSWD:ALL'))
