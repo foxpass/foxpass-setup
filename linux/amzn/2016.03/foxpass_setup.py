@@ -60,7 +60,7 @@ def main():
     run_authconfig(args.ldap_uri, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw, args.ldaps)
     augment_sshd_config()
-    fix_sudo(args.sudoers_group, args.require_sudoers_pw)
+    fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoer)
 
     # sleep to the next second to make sure sssd.conf has a new timestamp
     time.sleep(1)
