@@ -49,6 +49,7 @@ def main():
                         default=False,
                         action='store_true',
                         help='set sudoers default password requirement')
+    parser.add_argument('--search-timeout', default=6, help='option to set the sssd search timeout')
 
     args = parser.parse_args()
 
@@ -58,7 +59,7 @@ def main():
     install_dependencies()
     write_foxpass_ssh_keys_script(apis, args.api_key)
     run_authconfig(args.ldap_uri, args.base_dn)
-    configure_sssd(bind_dn, args.bind_pw, args.ldaps)
+    configure_sssd(bind_dn, args.bind_pw, args.ldaps, args.search_timeout)
     augment_sshd_config()
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
 
@@ -123,7 +124,7 @@ def run_authconfig(uri, base_dn):
     os.system(cmd)
 
 
-def configure_sssd(bind_dn, bind_pw, backup_ldaps):
+def configure_sssd(bind_dn, bind_pw, backup_ldaps, timeout):
     from SSSDConfig import SSSDConfig
 
     sssdconfig = SSSDConfig()
@@ -137,6 +138,7 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
     domain.set_option('ldap_tls_cacert', '/etc/ssl/certs/ca-bundle.crt')
     domain.set_option('ldap_default_bind_dn', bind_dn)
     domain.set_option('ldap_default_authtok', bind_pw)
+    domain.set_opotion('ldap_search_timeout', timeout)
     domain.set_option('enumerate', True)
     domain.remove_option('ldap_tls_cacertdir')
 
