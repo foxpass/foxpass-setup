@@ -189,11 +189,11 @@ def augment_sshd_config():
 
 
 def augment_pam():
-    if not file_contains('/etc/pam.d/common-session', r'pam_mkhomedir\.so'):
+    if not file_contains('/etc/pam.d/common-session', r'.*pam_mkhomedir\.so'):
         with open('/etc/pam.d/common-session', "a") as w:
             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
 
-    if not file_contains('/etc/pam.d/common-session-noninteractive', r'pam_mkhomedir\.so'):
+    if not file_contains('/etc/pam.d/common-session-noninteractive', r'.*pam_mkhomedir\.so'):
         with open('/etc/pam.d/common-session-noninteractive', "a") as w:
             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
 
