@@ -177,7 +177,7 @@ def restart():
 def file_contains(filename, pattern):
     with open(filename) as f:
         for line in f:
-            if re.match(pattern, line):
+            if re.search(pattern, line):
                 return True
     return False
 
