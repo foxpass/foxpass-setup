@@ -169,16 +169,13 @@ def write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
 
 
 def clean_authorizedkeyscommand(sshd_config_file):
-    sshd_config_temp_file = '/tmp/sshd_config'
-    sshd_config = open(sshd_config_file, 'r')
-    lines = sshd_config.readlines()
-    sshd_config.close()
-    sshd_config_temp = open(sshd_config_temp_file, 'w')
-    for line in lines:
-        if ('AuthorizedKeysCommand' or 'AuthorizedKeysCommandUser') not in line:
-            sshd_config_temp.write(line)
-    sshd_config_temp.close()
-    os.rename(sshd_config_temp_file, sshd_config_file)
+    with open(sshd_config_file, 'r+') as f:
+        lines = f.readlines()
+        f.seek(0)
+        for line in lines:
+            if ('AuthorizedKeysCommand' or 'AuthorizedKeysCommandUser') not in line:
+                f.write(line)
+        f.truncate()
 
 
 # give "wheel" and chosen sudoers groups sudo permissions without password
