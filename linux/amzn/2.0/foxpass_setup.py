@@ -173,7 +173,9 @@ def clean_authorizedkeyscommand(sshd_config_file):
         lines = f.readlines()
         f.seek(0)
         for line in lines:
-            if ('AuthorizedKeysCommand' or 'AuthorizedKeysCommandUser') not in line:
+            if re.match(r'AuthorizedKeysCommand', line):
+                f.write('# ' + line)
+            else:
                 f.write(line)
         f.truncate()
 
