@@ -45,6 +45,7 @@ def main():
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
+    parser.add_argument('--keep-command', default=False, action='store_true', help='Do not replace sshd key command')
     parser.add_argument('--require-sudoers-pw',
                         default=False,
                         action='store_true',
@@ -59,7 +60,7 @@ def main():
     write_foxpass_ssh_keys_script(apis, args.api_key)
     run_authconfig(args.ldap_uri, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw, args.ldaps)
-    augment_sshd_config()
+    augment_sshd_config(args.keep_command)
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
 
     # sleep to the next second to make sure sssd.conf has a new timestamp
@@ -145,12 +146,38 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
     sssdconfig.write()
 
 
-def augment_sshd_config():
-    if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand\w'):
-        with open('/etc/ssh/sshd_config', "a") as w:
-            w.write("\n")
-            w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
-            w.write("AuthorizedKeysCommandUser\troot\n")
+def augment_sshd_config(keep_command):
+    sshd_config_file = '/etc/ssh/sshd_config'
+    key_command = 'AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n'
+    key_command_user = 'AuthorizedKeysCommandUser\troot\n'
+    if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\w'):
+        write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
+    elif not keep_command:
+        if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys\.sh$'):
+            clean_authorizedkeyscommand(sshd_config_file)
+            write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
+    else:
+        print 'AuthorizedKeysCommand already set, will not use Foxpass for ssh key verification'
+        return
+
+
+def write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user):
+    with open(sshd_config_file, 'a') as w:
+        w.write('\n')
+        w.write(key_command)
+        w.write(key_command_user)
+
+
+def clean_authorizedkeyscommand(sshd_config_file):
+    with open(sshd_config_file, 'r+') as f:
+        lines = f.readlines()
+        f.seek(0)
+        for line in lines:
+            if re.match(r'^AuthorizedKeysCommand', line):
+                f.write('# ' + line)
+            else:
+                f.write(line)
+        f.truncate()
 
 
 # give "wheel" and chosen sudoers groups sudo permissions without password
