@@ -153,7 +153,7 @@ def augment_sshd_config(keep_command):
     if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\w'):
         write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
     elif not keep_command:
-        if not file_contains(sshd_config_file, r'{}'.format(key_command)):
+        if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys\.sh$'):
             clean_authorizedkeyscommand(sshd_config_file)
             write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
     else:
@@ -173,7 +173,7 @@ def clean_authorizedkeyscommand(sshd_config_file):
         lines = f.readlines()
         f.seek(0)
         for line in lines:
-            if re.match(r'AuthorizedKeysCommand', line):
+            if re.match(r'^AuthorizedKeysCommand', line):
                 f.write('# ' + line)
             else:
                 f.write(line)
