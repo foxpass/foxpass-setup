@@ -223,7 +223,7 @@ def check_perms(file, mask):
     if int(file_mask, 8) == mask:
         return True
     else:
-        print 'updating %s to %s' % (file, oct(mask))
+        print('updating %s to %s' % (file, oct(mask)))
         os.chmod(file, mask)
 
 
