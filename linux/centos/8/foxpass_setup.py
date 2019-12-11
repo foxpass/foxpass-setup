@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Copyright (c) 2016-present, Foxpass, Inc.
 # All rights reserved.
@@ -65,7 +65,7 @@ def main():
     # sleep to the next second to make sure sssd.conf has a new timestamp
     time.sleep(1)
     # touch the sssd conf file again
-    os.system('touch /etc/sssd/sssd.conf')
+    os.system('touch /etc/sssd/conf.d/authconfig-sssd.conf')
 
     restart()
 
@@ -126,7 +126,7 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
     from SSSDConfig import SSSDConfig
 
     sssdconfig = SSSDConfig()
-    sssdconfig.import_config('/etc/sssd/sssd.conf')
+    sssdconfig.import_config('/etc/sssd/conf.d/authconfig-sssd.conf')
 
     domain = sssdconfig.get_domain('default')
     domain.add_provider('ldap', 'id')
