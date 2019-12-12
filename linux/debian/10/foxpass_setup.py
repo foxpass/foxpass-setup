@@ -229,7 +229,7 @@ def check_perms(file, mask):
 
 def restart():
     # test nslcd.conf permissions
-    check_perms('/etc/nslcd.conf', 0600)
+    check_perms('/etc/nslcd.conf', 0o600)
     # restart nslcd, nscd, ssh
     os.system("service nslcd restart")
     os.system("service nscd restart")
