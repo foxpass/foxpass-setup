@@ -54,7 +54,7 @@ def main():
 
     args = parser.parse_args()
 
-    binddn = 'cn={},{}'.format(args.bind_user, args.base_dn)
+    binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
     uris = [args.ldap_uri] + args.ldaps
 
