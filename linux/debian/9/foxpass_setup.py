@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Copyright (c) 2015-present, Foxpass, Inc.
 # All rights reserved.

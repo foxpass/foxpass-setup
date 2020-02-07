@@ -54,7 +54,7 @@ def main():
 
     args = parser.parse_args()
 
-    binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
+    binddn = 'cn={},{}'.format(args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
     uris = [args.ldap_uri] + args.ldaps
 
@@ -89,7 +89,7 @@ def write_foxpass_ssh_keys_script(apis, api_key):
     for api in apis:
         curls.append(base_curl % api)
 
-    with open('/usr/sbin/foxpass_ssh_keys.sh', "w") as w:
+    with open('/usr/sbin/foxpass_ssh_keys.sh', 'w') as w:
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
@@ -223,7 +223,7 @@ def check_perms(file, mask):
     if int(file_mask, 8) == mask:
         return True
     else:
-        print('updating %s to %s' % (file, oct(mask)))
+        print('updating {} to {}'.format(file, oct(mask)))
         os.chmod(file, mask)
 
 
