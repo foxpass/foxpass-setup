@@ -232,9 +232,11 @@ def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
 # this will ignore some future changes made to /etc/ssh/config files.
 # We move it to disabled, to revert simply rename the file without the .disabled
 def fix_eic():
-    os.system('systemctl stop ssh.service')
-    os.system('mv /lib/systemd/system/ssh.service.d/ec2-instance-connect.conf /lib/systemd/system/ssh.service.d/ec2-instance-connect.conf.disabled')
-    os.system('systemctl daemon-reload')
+    eic_file = '/lib/systemd/system/ssh.service.d/ec2-instance-connect.conf'
+    if os.path.exists(eic_file):
+        os.system('systemctl stop ssh.service')
+        os.system('mv {} {}.disabled'.format(eic_file, eic_file))
+        os.system('systemctl daemon-reload')
 
 
 def restart():
