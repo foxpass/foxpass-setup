@@ -228,7 +228,7 @@ def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
         os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
 
 
-# Amazon is hard loading their configs if they don't dectec everything,
+# Amazon is hard loading their configs if they don't dectect everything,
 # this will ignore some future changes made to /etc/ssh/config files.
 # We move it to disabled, to revert simply rename the file without the .disabled
 def fix_eic():
