@@ -66,6 +66,7 @@ def main():
     time.sleep(1)
     # touch the sssd conf file again
     os.system('touch /etc/sssd/conf.d/authconfig-sssd.conf')
+    os.system('chmod 600 /etc/sssd/conf.d/authconfig-sssd.conf')
 
     restart()
 
