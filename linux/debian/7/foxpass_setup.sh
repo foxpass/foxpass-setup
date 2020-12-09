@@ -43,12 +43,12 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd
 
 # write to foxpass_ssh_keys.sh
 cat > /foxpass_ssh_keys.sh <<"EOF"
-#!/bin/sh
+#!/bin/bash
 
 user="$1"
 secret="__API_KEY__"
 hostname=`hostname`
-if grep -q "^${user}:" /etc/passwd; then exit 1; fi
+if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
 
 curl -q -m 5 -f "https://api.foxpass.com/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
 
