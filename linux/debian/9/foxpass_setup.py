@@ -223,13 +223,13 @@ def check_perms(file, mask):
     if int(file_mask, 8) == mask:
         return True
     else:
-        print 'updating %s to %s' % (file, oct(mask))
+        print('updating %s to %s' % (file, oct(mask)))
         os.chmod(file, mask)
 
 
 def restart():
     # test nslcd.conf permissions
-    check_perms('/etc/nslcd.conf', 0600)
+    check_perms('/etc/nslcd.conf', 0o600)
     # restart nslcd, nscd, ssh
     os.system("service nslcd restart")
     os.system("service nscd restart")
