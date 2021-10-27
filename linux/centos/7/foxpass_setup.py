@@ -87,12 +87,12 @@ def write_foxpass_ssh_keys_script(apis, api_key):
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
             contents = """\
-#!/bin/sh
+#!/bin/bash
 
 user="$1"
 secret="%s"
 hostname=`hostname`
-if grep -q "^${user}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
 aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
 aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 %s
@@ -102,12 +102,12 @@ exit $?
             append = '" 2>/dev/null'
             curls = [curl + append for curl in curls]
             contents = """\
-#!/bin/sh
+#!/bin/bash
 
 user="$1"
 secret="%s"
 hostname=`uname -n`
-if grep -q "^${user}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
 %s
 exit $?
 """
@@ -119,7 +119,7 @@ exit $?
 
 def run_authconfig(uri, base_dn):
     cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=uri, base_dn=base_dn)
-    print 'Running %s' % cmd
+    print('Running %s' % cmd)
     os.system(cmd)
 
 
@@ -178,7 +178,7 @@ def restart():
 def file_contains(filename, pattern):
     with open(filename) as f:
         for line in f:
-            if re.match(pattern, line):
+            if re.search(pattern, line):
                 return True
     return False
 

@@ -45,6 +45,7 @@ def main():
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
+    parser.add_argument('--keep-command', default=False, action='store_true', help='Do not replace sshd key command')
     parser.add_argument('--require-sudoers-pw',
                         default=False,
                         action='store_true',
@@ -87,12 +88,12 @@ def write_foxpass_ssh_keys_script(apis, api_key):
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
             contents = """\
-#!/bin/sh
+#!/bin/bash
 
 user="$1"
 secret="%s"
 hostname=`hostname`
-if grep -q "^${user}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
 aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
 aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 %s
@@ -102,12 +103,12 @@ exit $?
             append = '" 2>/dev/null'
             curls = [curl + append for curl in curls]
             contents = """\
-#!/bin/sh
+#!/bin/bash
 
 user="$1"
 secret="%s"
 hostname=`hostname`
-if grep -q "^${user}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
 %s
 exit $?
 """
@@ -137,7 +138,7 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps, timeout):
     domain.set_option('ldap_tls_cacert', '/etc/ssl/certs/ca-bundle.crt')
     domain.set_option('ldap_default_bind_dn', bind_dn)
     domain.set_option('ldap_default_authtok', bind_pw)
-    domain.set_opotion('ldap_search_timeout', timeout)
+    domain.set_option('ldap_search_timeout', timeout)
     domain.set_option('enumerate', True)
     domain.remove_option('ldap_tls_cacertdir')
 
@@ -147,12 +148,38 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps, timeout):
     sssdconfig.write()
 
 
-def augment_sshd_config():
-    if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand\w'):
-        with open('/etc/ssh/sshd_config', "a") as w:
-            w.write("\n")
-            w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
-            w.write("AuthorizedKeysCommandUser\troot\n")
+def augment_sshd_config(keep_command):
+    sshd_config_file = '/etc/ssh/sshd_config'
+    key_command = 'AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n'
+    key_command_user = 'AuthorizedKeysCommandUser\troot\n'
+    if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\w'):
+        write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
+    elif not keep_command:
+        if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys\.sh$'):
+            clean_authorizedkeyscommand(sshd_config_file)
+            write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
+    else:
+        print 'AuthorizedKeysCommand already set, will not use Foxpass for ssh key verification'
+        return
+
+
+def write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user):
+    with open(sshd_config_file, 'a') as w:
+        w.write('\n')
+        w.write(key_command)
+        w.write(key_command_user)
+
+
+def clean_authorizedkeyscommand(sshd_config_file):
+    with open(sshd_config_file, 'r+') as f:
+        lines = f.readlines()
+        f.seek(0)
+        for line in lines:
+            if re.match(r'^AuthorizedKeysCommand', line):
+                f.write('# ' + line)
+            else:
+                f.write(line)
+        f.truncate()
 
 
 # give "wheel" and chosen sudoers groups sudo permissions without password
@@ -178,7 +205,7 @@ def restart():
 def file_contains(filename, pattern):
     with open(filename) as f:
         for line in f:
-            if re.match(pattern, line):
+            if re.search(pattern, line):
                 return True
     return False
 

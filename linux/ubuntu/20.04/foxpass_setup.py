@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Copyright (c) 2015-present, Foxpass, Inc.
 # All rights reserved.
@@ -29,7 +29,6 @@ from datetime import datetime
 import os
 import re
 import sys
-import time
 import urllib3
 
 
@@ -66,21 +65,34 @@ def main():
     augment_pam()
     fix_nsswitch()
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
+    fix_eic()
     restart()
 
 
 def apt_get_update():
-    now = datetime.now()
-    apt_cache_age = datetime.fromtimestamp(os.stat('/var/cache/apt').st_mtime)
-    delta = now - apt_cache_age
+    # This section requires that the update-notifier package be installed.
+    update_notifier_file = '/var/lib/apt/periodic/update-success-stamp'
+    notifier_file_exists = os.path.exists(update_notifier_file)
 
-    if delta.days > 7:
+    if not notifier_file_exists:
+        # No way to check last apt-get update, so we always run.
         os.system('apt-get update')
+    else:
+        # Otherwise only if it hasn't been updated in over 7 days.
+        now = datetime.now()
+        apt_cache_age = datetime.fromtimestamp(os.stat(update_notifier_file).st_mtime)
+        delta = now - apt_cache_age
+        if delta.days > 7:
+            os.system('apt-get update')
 
 
 def install_dependencies():
     # install dependencies, without the fancy ui
-    os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
+    # capture the return code and exit passing the code if apt-get fails
+    return_code = os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
+    if return_code != 0:
+        # bitshift right 8 to get rid of the signal portion of the return code
+        sys.exit(return_code >> 8)
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
@@ -89,7 +101,7 @@ def write_foxpass_ssh_keys_script(apis, api_key):
     for api in apis:
         curls.append(base_curl % api)
 
-    with open('/usr/sbin/foxpass_ssh_keys.sh', "w") as w:
+    with open('/usr/local/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
@@ -121,7 +133,7 @@ exit $?
         w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
-        os.system('chmod 700 /usr/sbin/foxpass_ssh_keys.sh')
+        os.system('chmod 700 /usr/local/sbin/foxpass_ssh_keys.sh')
 
 
 # write nslcd.conf, with substutions
@@ -181,16 +193,16 @@ def augment_sshd_config():
     if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand\w'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
-            w.write("AuthorizedKeysCommand\t\t/usr/sbin/foxpass_ssh_keys.sh\n")
+            w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
             w.write("AuthorizedKeysCommandUser\troot\n")
 
 
 def augment_pam():
-    if not file_contains('/etc/pam.d/common-session', r'pam_mkhomedir.so'):
+    if not file_contains('/etc/pam.d/common-session', r'pam_mkhomedir\.so'):
         with open('/etc/pam.d/common-session', "a") as w:
             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
 
-    if not file_contains('/etc/pam.d/common-session-noninteractive', r'pam_mkhomedir.so'):
+    if not file_contains('/etc/pam.d/common-session-noninteractive', r'pam_mkhomedir\.so'):
         with open('/etc/pam.d/common-session-noninteractive', "a") as w:
             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
 
@@ -216,11 +228,22 @@ def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
         os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
 
 
+# Amazon is hard loading their configs if they don't dectect everything,
+# this will ignore some future changes made to /etc/ssh/config files.
+# We move it to disabled, to revert simply rename the file without the .disabled
+def fix_eic():
+    eic_file = '/lib/systemd/system/ssh.service.d/ec2-instance-connect.conf'
+    if os.path.exists(eic_file):
+        os.system('systemctl stop ssh.service')
+        os.system('mv {} {}.disabled'.format(eic_file, eic_file))
+        os.system('systemctl daemon-reload')
+
+
 def restart():
     # restart nslcd, nscd, ssh
-    os.system("service nslcd restart")
-    os.system("service nscd restart")
-    os.system("service ssh restart")
+    os.system('systemctl restart nslcd.service')
+    os.system('systemctl restart nscd.service')
+    os.system('systemctl restart ssh.service')
 
 
 def file_contains(filename, pattern):

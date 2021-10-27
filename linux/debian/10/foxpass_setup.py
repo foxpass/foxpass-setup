@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # Copyright (c) 2015-present, Foxpass, Inc.
 # All rights reserved.
@@ -216,7 +216,20 @@ def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
         os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
 
 
+# check file permissions (mask should be in octal short hand ie 0644 or 0600)
+def check_perms(file, mask):
+    # first item in the set is the permissions, then we just want the last 3 digits (of the octal)
+    file_mask = oct(os.stat(file)[0])[-3:]
+    if int(file_mask, 8) == mask:
+        return True
+    else:
+        print('updating %s to %s' % (file, oct(mask)))
+        os.chmod(file, mask)
+
+
 def restart():
+    # test nslcd.conf permissions
+    check_perms('/etc/nslcd.conf', 0o600)
     # restart nslcd, nscd, ssh
     os.system("service nslcd restart")
     os.system("service nscd restart")

@@ -37,12 +37,12 @@ yum install -y sssd authconfig
 
 # write to foxpass_ssh_keys.sh
 cat > /usr/local/bin/foxpass_ssh_keys.sh <<"EOF"
-#!/bin/sh
+#!/bin/bash
 
 user="$1"
 secret="__API_KEY__"
 hostname=$(uname -n)
-if grep -q "^${user}:" /etc/passwd; then exit 1; fi
+if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
 
 curl -q -m 5 -f "https://api.foxpass.com/sshkeys/?secret=${secret}&user=${user}&hostname=${hostname}" 2>/dev/null
 
