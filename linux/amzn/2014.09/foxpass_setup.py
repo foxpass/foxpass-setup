@@ -138,7 +138,7 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps, timeout):
     domain.set_option('ldap_tls_cacert', '/etc/ssl/certs/ca-bundle.crt')
     domain.set_option('ldap_default_bind_dn', bind_dn)
     domain.set_option('ldap_default_authtok', bind_pw)
-    domain.set_opotion('ldap_search_timeout', timeout)
+    domain.set_option('ldap_search_timeout', timeout)
     domain.set_option('enumerate', True)
     domain.remove_option('ldap_tls_cacertdir')
 

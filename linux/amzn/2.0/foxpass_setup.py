@@ -61,7 +61,7 @@ def main():
     write_foxpass_ssh_keys_script(apis, args.api_key)
     run_authconfig(args.ldap_uri, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw, args.ldaps, args.search_timeout)
-    augment_sshd_config()
+    augment_sshd_config(args.keep_command)
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
 
     # sleep to the next second to make sure sssd.conf has a new timestamp
