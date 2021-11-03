@@ -129,6 +129,10 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps):
     sssdconfig = SSSDConfig()
     sssdconfig.import_config('/etc/sssd/conf.d/authconfig-sssd.conf')
 
+    sssdconfig.new_service('pam')
+    sssdconfig.new_service('nss')
+    sssdconfig.activate_service('pam')
+    sssdconfig.activate_service('nss')
     domain = sssdconfig.get_domain('default')
     domain.add_provider('ldap', 'id')
     if backup_ldaps:
