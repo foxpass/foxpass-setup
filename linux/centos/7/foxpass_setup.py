@@ -89,8 +89,7 @@ def write_foxpass_ssh_keys_script(apis, api_key, debug):
     for api in apis:
         curls.append(base_curl % api)
 
-    from_file = []
-    if debug and os.path.exists('/usr/local/sbin/foxpass_ssh_keys.sh'):
+    if debug:
         from_file = open_file('/usr/local/sbin/foxpass_ssh_keys.sh')
 
     with open('/usr/local/sbin/foxpass_ssh_keys.sh', "w") as w:
@@ -133,12 +132,13 @@ exit $?
 
 
 def run_authconfig(uri, base_dn, debug):
-    from_file = []
-    if debug and os.path.exists('/etc/sssd/sssd.conf'):
+    if debug:
         from_file = open_file('/etc/sssd/sssd.conf')
+
     cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=uri, base_dn=base_dn)
     print('Running %s' % cmd)
     os.system(cmd)
+
     if debug:
         to_file = open_file('/etc/sssd/sssd.conf')
         diff_files(from_file, to_file, '/etc/sssd/sssd.conf')
@@ -225,15 +225,15 @@ def augment_sshd_config(debug):
 
 def augment_openldap(bind_dn, debug):
     if debug:
-        from_file = open_file('/etc/ssh/sshd_config')
+        from_file = open_file('/etc/openldap/ldap.conf')
 
     if not file_contains('/etc/openldap/ldap.conf', r'^SUDOERS_BASE'):
         with open('/etc/openldap/ldap.conf', "a") as w:
             w.write("\nSUDOERS_BASE ou=SUDOers,{}".format(bind_dn))
 
     if debug:
-        to_file = open_file('/etc/ssh/sshd_config')
-        diff_files(from_file, to_file, '/etc/ssh/sshd_config')
+        to_file = open_file('/etc/openldap/ldap.conf')
+        diff_files(from_file, to_file, '/etc/openldap/ldap.conf')
 
 
 def augment_nsswitch(debug):
@@ -252,8 +252,6 @@ def augment_nsswitch(debug):
 def fix_sudo(sudoers, require_sudoers_pw, update_sudoers, debug):
     if debug:
         from_sudoers_file = open_file('/etc/sudoers')
-    from_foxpass_sudo_file = ''
-    if os.path.exists('/etc/sudoers.d/95-foxpass-sudo'):
         from_foxpass_sudo_file = open_file('/etc/sudoers.d/95-foxpass-sudo')
 
     if not file_contains('/etc/sudoers', r'^#includedir /etc/sudoers.d'):
@@ -299,8 +297,11 @@ def is_ec2_host():
 
 
 def open_file(path):
-    with open(path, 'r') as file:
-        return file.readlines()
+    if os.path.exists(path):
+        with open(path, 'r') as file:
+            return file.readlines()
+    else:
+        return []
 
 
 def diff_files(from_file, to_file, filename):
