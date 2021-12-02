@@ -1,0 +1,15 @@
+FROM centos:8
+
+ARG API_KEY
+ARG BASE_DN
+ARG BIND_USER
+ARG BIND_PASSWORD
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN yum -y update && yum -y install python3-pip openssh-server sudo
+RUN pip3 install urllib3
+
+COPY linux/centos/8/foxpass_setup.py /
+
+ENTRYPOINT python3 foxpass_setup.py --base-dn {BASE_DN} --bind-user {BIND_USER} --bind-pw {BIND_PW} --api-key {API_KEY} --enable-ldap-sudoers --debug

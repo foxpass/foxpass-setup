@@ -199,8 +199,8 @@ def configure_ldap_sudoers(base_dn, sudo_timed, full_refresh_interval, smart_ref
     sssdconfig.save_domain(domain)
     sssdconfig.write()
 
-    augment_openldap(base_dn)
-    augment_nsswitch()
+    augment_openldap(base_dn, debug)
+    augment_nsswitch(debug)
 
     if debug:
         to_file = open_file('/etc/sssd/sssd.conf')
