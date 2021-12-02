@@ -205,7 +205,7 @@ def augment_sshd_config(debug):
         diff_files(from_file, to_file, '/etc/ssh/sshd_config')
 
 
-def augment_pam():
+def augment_pam(debug):
     if debug:
         from_cs_file = open_file('/etc/pam.d/common-session')
         from_csn_file = open_file('/etc/pam.d/common-session-noninteractive')
@@ -225,7 +225,7 @@ def augment_pam():
         diff_files(from_csn_file, to_csn_file, '/etc/pam.d/common-session-noninteractive')
 
 
-def fix_nsswitch():
+def fix_nsswitch(debug):
     if debug:
         from_file = open_file('/etc/nsswitch.conf')
 
@@ -239,7 +239,7 @@ def fix_nsswitch():
 
 
 # give "sudo" and chosen sudoers groups sudo permissions without password
-def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
+def fix_sudo(sudoers, require_sudoers_pw, update_sudoers, debug):
     if debug:
         from_sudoers_file = open_file('/etc/sudoers')
         from_foxpass_sudo_file = open_file('/etc/sudoers.d/95-foxpass-sudo')

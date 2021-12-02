@@ -143,7 +143,7 @@ def run_authconfig(uri, base_dn, debug):
         diff_files(from_file, to_file, '/etc/sssd/conf.d/authconfig-sssd.conf')
 
 
-def configure_sssd(bind_dn, bind_pw, backup_ldaps, opt_timeout):
+def configure_sssd(bind_dn, bind_pw, backup_ldaps, opt_timeout, debug):
     if debug:
         from_file = open_file('/etc/sssd/conf.d/authconfig-sssd.conf')
 
@@ -225,7 +225,7 @@ def augment_sshd_config(debug):
         to_file = open_file('/etc/ssh/sshd_config')
         diff_files(from_file, to_file, '/etc/ssh/sshd_config')
 
-def augment_openldap(bind_dn):
+def augment_openldap(bind_dn, debug):
     if debug:
         from_file = open_file('/etc/openldap/ldap.conf')
 
@@ -238,7 +238,7 @@ def augment_openldap(bind_dn):
         diff_files(from_file, to_file, '/etc/openldap/ldap.conf')
 
 
-def augment_nsswitch():
+def augment_nsswitch(debug):
     if debug:
         from_file = open_file('/etc/nsswitch.conf')
 
@@ -252,7 +252,7 @@ def augment_nsswitch():
 
 
 # give "wheel" and chosen sudoers groups sudo permissions without password
-def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
+def fix_sudo(sudoers, require_sudoers_pw, update_sudoers, debug):
     if debug:
         from_sudoers_file = open_file('/etc/sudoers')
         from_foxpass_sudo_file = open_file('/etc/sudoers.d/95-foxpass-sudo')

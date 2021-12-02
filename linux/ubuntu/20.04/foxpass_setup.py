@@ -69,7 +69,7 @@ def main():
     augment_pam(args.debug)
     fix_nsswitch(args.debug)
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers, args.debug)
-    fix_eic(args.debug)
+    fix_eic()
 
     if args.enable_ldap_sudoers:
         write_ldap_sudoers(uris, args.base_dn, binddn, args.bind_pw, args.sudoers_timed, args.bind_timelimit, args.query_timelimit, args.debug)
