@@ -58,14 +58,57 @@ def main():
     apis = [args.api_url] + args.apis
     uris = [args.ldap_uri] + args.ldaps
 
+    if debug:
+        foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
+        nslcd_path = '/etc/nslcd.conf'
+        sshd_config_path = '/etc/ssh/sshd_config'
+        cs_path = '/etc/pam.d/common-session'
+        csn_path = '/etc/pam.d/common-session-noninteractive'
+        nsswitch_path = open_file('/etc/nsswitch.conf')
+        sudoers_path = open_file('/etc/sudoers')
+        foxpass_sudo_path = open_file('/etc/sudoers.d/95-foxpass-sudo')
+        sudo_ldap_path = open_file('/etc/sudo-ldap.conf')
+
+        from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        from_file_nslcd = open_file(nslcd_path)
+        from_file_sshd_config = open_file(sshd_config_path)
+        from_file_cs = open_file(cs_path)
+        from_file_csn = open_file(csn_path)
+        from_file_nsswitch = open_file(nsswitch_path)
+        from_sudoers_file = open_file(sudoers_path)
+        from_foxpass_sudo_file = open_file(foxpass_sudo_path)
+        from_file_sudo_ldap = open_file(sudo_ldap_path)
+
     apt_get_update()
     install_dependencies()
-    write_foxpass_ssh_keys_script(apis, args.api_key, args.debug)
-    write_nslcd_conf(uris, args.base_dn, binddn, args.bind_pw, args.ldap_connections, args.idle_timelimit, args.debug)
-    augment_sshd_config(args.debug)
-    augment_pam(args.debug)
-    fix_nsswitch(args.debug)
-    fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers, args.debug)
+    write_foxpass_ssh_keys_script(apis, args.api_key)
+    write_nslcd_conf(uris, args.base_dn, binddn, args.bind_pw, args.ldap_connections, args.idle_timelimit)
+    augment_sshd_config()
+    augment_pam()
+    fix_nsswitch()
+    fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
+
+    if debug:
+        to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        to_file_nslcd = open_file(nslcd_path)
+        to_file_sshd_config = open_file(sshd_config_path)
+        to_file_cs = open_file(cs_path)
+        to_file_csn = open_file(csn_path)
+        to_file_nsswitch = open_file(nsswitch_path)
+        to_sudoers_file = open_file(sudoers_path)
+        to_foxpass_sudo_file = open_file(foxpass_sudo_path)
+        to_file_sudo_ldap = open_file(sudo_ldap_path)
+
+        diff_files(from_file_foxpass_ssh_keys, to_file_foxpass_ssh_keys, foxpass_ssh_keys_path)
+        diff_files(from_file_nslcd, to_file_nslcd, nslcd_path)
+        diff_files(from_file_sshd_config, to_file_sshd_config, sshd_config_path)
+        diff_files(from_file_cs, to_file_cs, cs_path)
+        diff_files(from_file_csn, to_file_csn, csn_path)
+        diff_files(from_file_nsswitch, to_file_nsswitch, nsswitch_path)
+        diff_files(from_sudoers_file, to_sudoers_file, sudoers_path)
+        diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, foxpass_sudo_path)
+        diff_files(from_file_sudo_ldap, to_file_sudo_ldap, sudo_ldap_path)
+
     restart()
 
 
@@ -83,14 +126,11 @@ def install_dependencies():
     os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
 
 
-def write_foxpass_ssh_keys_script(apis, api_key, debug):
+def write_foxpass_ssh_keys_script(apis, api_key):
     base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
     curls = []
     for api in apis:
         curls.append(base_curl % api)
-
-    if debug:
-        from_file = open_file('/usr/local/sbin/foxpass_ssh_keys.sh')
 
     with open('/usr/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
@@ -126,16 +166,9 @@ exit $?
         # give permissions only to root to protect the API key inside
         os.system('chmod 700 /usr/sbin/foxpass_ssh_keys.sh')
 
-    if debug:
-        to_file = open_file('/usr/local/sbin/foxpass_ssh_keys.sh')
-        diff_files(from_file, to_file, '/usr/local/sbin/foxpass_ssh_keys.sh')
-
 
 # write nslcd.conf, with substutions
-def write_nslcd_conf(uris, basedn, binddn, bindpw, threads, idle_timelimit, debug):
-    if debug:
-        from_file = open_file('/etc/nslcd.conf')
-
+def write_nslcd_conf(uris, basedn, binddn, bindpw, threads, idle_timelimit):
     with open('/etc/nslcd.conf', "w") as w:
         content = """\
 # /etc/nslcd.conf
@@ -186,10 +219,6 @@ nss_initgroups_ignoreusers ALLLOCAL
         w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
                                bindpw=bindpw, sslstatus=sslstatus, threads=threads, idle_timelimit=idle_timelimit))
 
-    if debug:
-        to_file = open_file('/etc/nslcd.conf')
-        diff_files(from_file, to_file, '/etc/nslcd.conf')
-
 
 def augment_sshd_config(debug):
     if debug:
@@ -201,16 +230,8 @@ def augment_sshd_config(debug):
             w.write("AuthorizedKeysCommand\t\t/usr/sbin/foxpass_ssh_keys.sh\n")
             w.write("AuthorizedKeysCommandUser\troot\n")
 
-    if debug:
-        to_file = open_file('/etc/ssh/sshd_config')
-        diff_files(from_file, to_file, '/etc/ssh/sshd_config')
 
-
-def augment_pam(debug):
-    if debug:
-        from_cs_file = open_file('/etc/pam.d/common-session')
-        from_csn_file = open_file('/etc/pam.d/common-session-noninteractive')
-
+def augment_pam():
     if not file_contains('/etc/pam.d/common-session', r'pam_mkhomedir.so'):
         with open('/etc/pam.d/common-session', "a") as w:
             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
@@ -219,32 +240,15 @@ def augment_pam(debug):
         with open('/etc/pam.d/common-session-noninteractive', "a") as w:
             w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
 
-    if debug:
-        to_cs_file = open_file('/etc/pam.d/common-session')
-        to_csn_file = open_file('/etc/pam.d/common-session-noninteractive')
-        diff_files(from_cs_file, to_cs_file, '/etc/pam.d/common-session')
-        diff_files(from_csn_file, to_csn_file, '/etc/pam.d/common-session-noninteractive')
 
-
-def fix_nsswitch(debug):
-    if debug:
-        from_file = open_file('/etc/nsswitch.conf')
-
+def fix_nsswitch():
     os.system("sed -i 's/passwd:.*/passwd:         compat ldap/' /etc/nsswitch.conf")
     os.system("sed -i 's/group:.*/group:          compat ldap/' /etc/nsswitch.conf")
     os.system("sed -i 's/shadow:.*/shadow:         compat ldap/' /etc/nsswitch.conf")
 
-    if debug:
-        to_file = open_file('/etc/nsswitch.conf')
-        diff_files(from_file, to_file, '/etc/nsswitch.conf')
-
 
 # give "sudo" and chosen sudoers groups sudo permissions without password
 def fix_sudo(sudoers, require_sudoers_pw, update_sudoers, debug):
-    if debug:
-        from_sudoers_file = open_file('/etc/sudoers')
-        from_foxpass_sudo_file = open_file('/etc/sudoers.d/95-foxpass-sudo')
-
     if not file_contains('/etc/sudoers', r'^#includedir /etc/sudoers.d'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d\n')
@@ -256,12 +260,6 @@ def fix_sudo(sudoers, require_sudoers_pw, update_sudoers, debug):
                     format(sudo=sudoers, command='ALL' if require_sudoers_pw else 'NOPASSWD:ALL'))
     if not require_sudoers_pw:
         os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
-
-    if debug:
-        to_sudoers_file = open_file('/etc/sudoers')
-        to_foxpass_sudo_file = open_file('/etc/sudoers.d/95-foxpass-sudo')
-        diff_files(from_sudoers_file, to_sudoers_file, '/etc/sudoers')
-        diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, '/etc/sudoers.d/95-foxpass-sudo')
 
 
 # check file permissions (mask should be in octal short hand ie 0644 or 0600)

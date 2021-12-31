@@ -61,15 +61,49 @@ def main():
     bind_dn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
 
+    if debug:
+        foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
+        sssd_path = '/etc/sssd/sssd.conf'
+        sshd_config_path = '/etc/ssh/sshd_config'
+        ldap_path = open_file('/etc/openldap/ldap.conf')
+        nsswitch_path = open_file('/etc/nsswitch.conf')
+        sudoers_path = open_file('/etc/sudoers')
+        foxpass_sudo_path = open_file('/etc/sudoers.d/95-foxpass-sudo')
+
+        from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        from_file_sssd = open_file(sssd_path)
+        from_file_sshd_config = open_file(sshd_config_path)
+        from_file_ldap = open_file(ldap_path)
+        from_file_nsswitch = open_file(nsswitch_path)
+        from_sudoers_file = open_file(sudoers_path)
+        from_foxpass_sudo_file = open_file(foxpass_sudo_path)
+
     install_dependencies()
-    write_foxpass_ssh_keys_script(apis, args.api_key, args.debug)
-    run_authconfig(args.ldap_uri, args.base_dn, args.debug)
-    configure_sssd(bind_dn, args.bind_pw, args.ldaps, args.opt_timeout, args.debug)
-    augment_sshd_config(args.keep_command, args.debug)
-    fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers, args.debug)
+    write_foxpass_ssh_keys_script(apis, args.api_key)
+    run_authconfig(args.ldap_uri, args.base_dn)
+    configure_sssd(bind_dn, args.bind_pw, args.ldaps, args.opt_timeout)
+    augment_sshd_config(args.keep_command)
+    fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
 
     if args.enable_ldap_sudoers:
-        configure_ldap_sudoers(args.base_dn, args.sudo_timed, args.full_refresh_interval, args.smart_refresh_interval, args.debug)
+        configure_ldap_sudoers(args.base_dn, args.sudo_timed, args.full_refresh_interval, args.smart_refresh_interval)
+
+    if debug:
+        to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        to_file_sssd = open_file(sssd_path)
+        to_file_sshd_config = open_file(sshd_config_path)
+        to_file_ldap = open_file(ldap_path)
+        to_file_nsswitch = open_file(nsswitch_path)
+        to_sudoers_file = open_file(sudoers_path)
+        to_foxpass_sudo_file = open_file(foxpass_sudo_path)
+
+        diff_files(from_file_foxpass_ssh_keys, to_file_foxpass_ssh_keys, foxpass_ssh_keys_path)
+        diff_files(from_file_sssd, to_file_sssd, sssd_path)
+        diff_files(from_file_sshd_config, to_file_sshd_config, sshd_config_path)
+        diff_files(from_file_ldap, to_file_ldap, ldap_path)
+        diff_files(from_file_nsswitch, to_file_nsswitch, nsswitch_path)
+        diff_files(from_sudoers_file, to_sudoers_file, sudoers_path)
+        diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, foxpass_sudo_path)
 
     # sleep to the next second to make sure sssd.conf has a new timestamp
     time.sleep(1)
@@ -84,14 +118,11 @@ def install_dependencies():
     os.system('yum install -y sssd authconfig')
 
 
-def write_foxpass_ssh_keys_script(apis, api_key, debug):
+def write_foxpass_ssh_keys_script(apis, api_key):
     base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
     curls = []
     for api in apis:
         curls.append(base_curl % api)
-
-    if debug:
-        from_file = open_file('/usr/local/sbin/foxpass_ssh_keys.sh')
 
     with open('/usr/local/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
@@ -127,26 +158,14 @@ exit $?
         # give permissions only to root to protect the API key inside
         os.system('chmod 700 /usr/local/sbin/foxpass_ssh_keys.sh')
 
-    if debug:
-        to_file = open_file('/usr/local/sbin/foxpass_ssh_keys.sh')
-        diff_files(from_file, to_file, '/usr/local/sbin/foxpass_ssh_keys.sh')
 
-
-def run_authconfig(uri, base_dn, debug):
-    if debug:
-        from_file = open_file('/etc/sssd/sssd.conf')
+def run_authconfig(uri, base_dn):
     cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=uri, base_dn=base_dn)
     print 'Running %s' % cmd
     os.system(cmd)
-    if debug:
-        to_file = open_file('/etc/sssd/sssd.conf')
-        diff_files(from_file, to_file, '/etc/sssd/sssd.conf')
 
 
-def configure_sssd(bind_dn, bind_pw, backup_ldaps, opt_timeout, debug):
-    if debug:
-        from_file = open_file('/etc/sssd/sssd.conf')
-
+def configure_sssd(bind_dn, bind_pw, backup_ldaps, opt_timeout):
     from SSSDConfig import SSSDConfig
 
     sssdconfig = SSSDConfig()
@@ -169,15 +188,8 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps, opt_timeout, debug):
     sssdconfig.save_domain(domain)
     sssdconfig.write()
 
-    if debug:
-        to_file = open_file('/etc/sssd/sssd.conf')
-        diff_files(from_file, to_file, '/etc/sssd/sssd.conf')
 
-
-def configure_ldap_sudoers(base_dn, sudo_timed, full_refresh_interval, smart_refresh_interval, debug):
-    if debug:
-        from_file = open_file('/etc/sssd/sssd.conf')
-
+def configure_ldap_sudoers(base_dn, sudo_timed, full_refresh_interval, smart_refresh_interval):
     from SSSDConfig import SSSDConfig
     sssdconfig = SSSDConfig()
     sssdconfig.import_config('/etc/sssd/sssd.conf')
@@ -199,79 +211,45 @@ def configure_ldap_sudoers(base_dn, sudo_timed, full_refresh_interval, smart_ref
     sssdconfig.save_domain(domain)
     sssdconfig.write()
 
-    augment_openldap(base_dn, debug)
-    augment_nsswitch(debug)
-
-    if debug:
-        to_file = open_file('/etc/sssd/sssd.conf')
-        diff_files(from_file, to_file, '/etc/sssd/sssd.conf')
+    augment_openldap(base_dn)
+    augment_nsswitch()
 
 
-def augment_sshd_config(keep_command, debug):
-    if debug:
-        from_file = open_file('/etc/ssh/sshd_config')
-
+def augment_sshd_config(keep_command):
     sshd_config_file = '/etc/ssh/sshd_config'
     key_command = 'AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n'
     key_command_user = 'AuthorizedKeysCommandUser\troot\n'
     if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\w'):
-        write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user, debug)
+        write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
     elif not keep_command:
         if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys\.sh$'):
-            clean_authorizedkeyscommand(sshd_config_file, debug)
-            write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user, debug)
+            clean_authorizedkeyscommand(sshd_config_file)
+            write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
     else:
         print 'AuthorizedKeysCommand already set, will not use Foxpass for ssh key verification'
         return
 
-    if debug:
-        to_file = open_file('/etc/ssh/sshd_config')
-        diff_files(from_file, to_file, '/etc/ssh/sshd_config')
 
-
-def augment_openldap(bind_dn, debug):
-    if debug:
-        from_file = open_file('/etc/openldap/ldap.conf')
-
+def augment_openldap(bind_dn):
     if not file_contains('/etc/openldap/ldap.conf', r'^SUDOERS_BASE'):
         with open('/etc/openldap/ldap.conf', "a") as w:
             w.write("\nSUDOERS_BASE ou=SUDOers,{}".format(bind_dn))
 
-    if debug:
-        to_file = open_file('/etc/openldap/ldap.conf')
-        diff_files(from_file, to_file, '/etc/openldap/ldap.conf')
 
-def augment_nsswitch(debug):
-    if debug:
-        from_file = open_file('/etc/nsswitch.conf')
-
+def augment_nsswitch():
     if not file_contains('/etc/nsswitch.conf', r'^sudoers:'):
         with open('/etc/nsswitch.conf', "a") as w:
             w.write("sudoers: files sss")
 
-    if debug:
-        to_file = open_file('/etc/nsswitch.conf')
-        diff_files(from_file, to_file, '/etc/nsswitch.conf')
 
-
-def write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user, debug):
-    if debug:
-        from_file = open_file(sshd_config_file)
-
+def write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user):
     with open(sshd_config_file, 'a') as w:
         w.write('\n')
         w.write(key_command)
         w.write(key_command_user)
 
-    if debug:
-        to_file = open_file(sshd_config_file)
-        diff_files(from_file, to_file, sshd_config_file)
 
-
-def clean_authorizedkeyscommand(sshd_config_file, debug):
-    if debug:
-        from_file = open_file(sshd_config_file)
-
+def clean_authorizedkeyscommand(sshd_config_file):
     with open(sshd_config_file, 'r+') as f:
         lines = f.readlines()
         f.seek(0)
@@ -282,17 +260,9 @@ def clean_authorizedkeyscommand(sshd_config_file, debug):
                 f.write(line)
         f.truncate()
 
-    if debug:
-        to_file = open_file(sshd_config_file)
-        diff_files(from_file, to_file, sshd_config_file)
-
 
 # give "wheel" and chosen sudoers groups sudo permissions without password
-def fix_sudo(sudoers, require_sudoers_pw, update_sudoers, debug):
-    if debug:
-        from_sudoers_file = open_file('/etc/sudoers')
-        from_foxpass_sudo_file = open_file('/etc/sudoers.d/95-foxpass-sudo')
-
+def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
     if not file_contains('/etc/sudoers', r'^#includedir /etc/sudoers.d'):
         with open('/etc/sudoers', 'a') as w:
             w.write('\n#includedir /etc/sudoers.d\n')
@@ -304,12 +274,6 @@ def fix_sudo(sudoers, require_sudoers_pw, update_sudoers, debug):
                     format(sudo=sudoers, command='ALL' if require_sudoers_pw else 'NOPASSWD:ALL'))
     if not require_sudoers_pw:
         os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
-
-    if debug:
-        to_sudoers_file = open_file('/etc/sudoers')
-        to_foxpass_sudo_file = open_file('/etc/sudoers.d/95-foxpass-sudo')
-        diff_files(from_sudoers_file, to_sudoers_file, '/etc/sudoers')
-        diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, '/etc/sudoers.d/95-foxpass-sudo')
 
 
 def restart():
