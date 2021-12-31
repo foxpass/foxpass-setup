@@ -12,4 +12,4 @@ RUN pip3 install urllib3
 
 COPY linux/debian/9/foxpass_setup.py /
 
-ENTRYPOINT python3 foxpass_setup.py --base-dn {BASE_DN} --bind-user {BIND_USER} --bind-pw {BIND_PW} --api-key {API_KEY} --debug
+ENTRYPOINT python3 foxpass_setup.py --base-dn ${BASE_DN} --bind-user ${BIND_USER} --bind-pw ${BIND_PASSWORD} --api-key ${API_KEY} --debug

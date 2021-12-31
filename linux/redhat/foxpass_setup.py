@@ -60,14 +60,14 @@ def main():
     bind_dn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
 
-    if debug:
+    if args.debug:
         foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
         sssd_path = '/etc/sssd/conf.d/authconfig-sssd.conf'
         sshd_config_path = '/etc/ssh/sshd_config'
-        ldap_path = open_file('/etc/openldap/ldap.conf')
-        nsswitch_path = open_file('/etc/nsswitch.conf')
-        sudoers_path = open_file('/etc/sudoers')
-        foxpass_sudo_path = open_file('/etc/sudoers.d/95-foxpass-sudo')
+        ldap_path = '/etc/openldap/ldap.conf'
+        nsswitch_path = '/etc/nsswitch.conf'
+        sudoers_path = '/etc/sudoers'
+        foxpass_sudo_path = '/etc/sudoers.d/95-foxpass-sudo'
 
         from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
         from_file_sssd = open_file(sssd_path)
@@ -87,7 +87,7 @@ def main():
     if args.enable_ldap_sudoers:
         configure_ldap_sudoers(args.base_dn, args.sudo_timed, args.full_refresh_interval, args.smart_refresh_interval)
 
-    if debug:
+    if args.debug:
         to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
         to_file_sssd = open_file(sssd_path)
         to_file_sshd_config = open_file(sshd_config_path)

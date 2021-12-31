@@ -61,16 +61,16 @@ def main():
     apis = [args.api_url] + args.apis
     uris = [args.ldap_uri] + args.ldaps
 
-    if debug:
+    if args.debug:
         foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
         nslcd_path = '/etc/nslcd.conf'
         sshd_config_path = '/etc/ssh/sshd_config'
         cs_path = '/etc/pam.d/common-session'
         csn_path = '/etc/pam.d/common-session-noninteractive'
-        nsswitch_path = open_file('/etc/nsswitch.conf')
-        sudoers_path = open_file('/etc/sudoers')
-        foxpass_sudo_path = open_file('/etc/sudoers.d/95-foxpass-sudo')
-        sudo_ldap_path = open_file('/etc/sudo-ldap.conf')
+        nsswitch_path = '/etc/nsswitch.conf'
+        sudoers_path = '/etc/sudoers'
+        foxpass_sudo_path = '/etc/sudoers.d/95-foxpass-sudo'
+        sudo_ldap_path = '/etc/sudo-ldap.conf'
 
         from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
         from_file_nslcd = open_file(nslcd_path)
@@ -94,7 +94,7 @@ def main():
     if args.enable_ldap_sudoers:
         write_ldap_sudoers(uris, args.base_dn, binddn, args.bind_pw, args.sudoers_timed, args.bind_timelimit, args.query_timelimit)
 
-    if debug:
+    if args.debug:
         to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
         to_file_nslcd = open_file(nslcd_path)
         to_file_sshd_config = open_file(sshd_config_path)
