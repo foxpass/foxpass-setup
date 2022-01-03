@@ -94,7 +94,7 @@ secret="%s"
 hostname=`hostname`
 if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
 
-aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 120"`
+aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
 if [ -z "$aws_token" ]
 then
   aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
