@@ -94,8 +94,17 @@ user="$1"
 secret="%s"
 hostname=`hostname`
 if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
-aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
-aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+
+aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
+if [ -z "$aws_token" ]
+then
+  aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+else
+  aws_instance_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+fi
+
 %s
 exit $?
 """
@@ -185,6 +194,16 @@ def file_contains(filename, pattern):
 
 
 def is_ec2_host():
+    http = urllib3.PoolManager(timeout=.1)
+    url = 'http://169.254.169.254/latest/api/token'
+    try:
+        r = http.request('PUT', url)
+        return True
+    except Exception:
+        return is_ec2_host_imds_v1_fallback()
+
+
+def is_ec2_host_imds_v1_fallback():
     http = urllib3.PoolManager(timeout=.1)
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
