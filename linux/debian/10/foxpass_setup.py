@@ -26,6 +26,7 @@
 
 import argparse
 from datetime import datetime
+import difflib
 import os
 import re
 import sys
@@ -47,16 +48,35 @@ def main():
     parser.add_argument('--idle-timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
-    parser.add_argument('--require-sudoers-pw',
-                        default=False,
-                        action='store_true',
-                        help='set sudoers default password requirement')
+    parser.add_argument('--require-sudoers-pw', default=False, action='store_true', help='set sudoers default password requirement')
+    parser.add_argument('--debug', default=False, action='store_true', help='Turn on debug mode')
 
     args = parser.parse_args()
 
     binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
     uris = [args.ldap_uri] + args.ldaps
+
+    if args.debug:
+        foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
+        nslcd_path = '/etc/nslcd.conf'
+        sshd_config_path = '/etc/ssh/sshd_config'
+        cs_path = '/etc/pam.d/common-session'
+        csn_path = '/etc/pam.d/common-session-noninteractive'
+        nsswitch_path = '/etc/nsswitch.conf'
+        sudoers_path = '/etc/sudoers'
+        foxpass_sudo_path = '/etc/sudoers.d/95-foxpass-sudo'
+        sudo_ldap_path = '/etc/sudo-ldap.conf'
+
+        from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        from_file_nslcd = open_file(nslcd_path)
+        from_file_sshd_config = open_file(sshd_config_path)
+        from_file_cs = open_file(cs_path)
+        from_file_csn = open_file(csn_path)
+        from_file_nsswitch = open_file(nsswitch_path)
+        from_sudoers_file = open_file(sudoers_path)
+        from_foxpass_sudo_file = open_file(foxpass_sudo_path)
+        from_file_sudo_ldap = open_file(sudo_ldap_path)
 
     apt_get_update()
     install_dependencies()
@@ -66,6 +86,28 @@ def main():
     augment_pam()
     fix_nsswitch()
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
+
+    if args.debug:
+        to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        to_file_nslcd = open_file(nslcd_path)
+        to_file_sshd_config = open_file(sshd_config_path)
+        to_file_cs = open_file(cs_path)
+        to_file_csn = open_file(csn_path)
+        to_file_nsswitch = open_file(nsswitch_path)
+        to_sudoers_file = open_file(sudoers_path)
+        to_foxpass_sudo_file = open_file(foxpass_sudo_path)
+        to_file_sudo_ldap = open_file(sudo_ldap_path)
+
+        diff_files(from_file_foxpass_ssh_keys, to_file_foxpass_ssh_keys, foxpass_ssh_keys_path)
+        diff_files(from_file_nslcd, to_file_nslcd, nslcd_path)
+        diff_files(from_file_sshd_config, to_file_sshd_config, sshd_config_path)
+        diff_files(from_file_cs, to_file_cs, cs_path)
+        diff_files(from_file_csn, to_file_csn, csn_path)
+        diff_files(from_file_nsswitch, to_file_nsswitch, nsswitch_path)
+        diff_files(from_sudoers_file, to_sudoers_file, sudoers_path)
+        diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, foxpass_sudo_path)
+        diff_files(from_file_sudo_ldap, to_file_sudo_ldap, sudo_ldap_path)
+
     restart()
 
 
@@ -271,6 +313,20 @@ def is_ec2_host_imds_v1_fallback():
         return True
     except Exception:
         return False
+
+
+def open_file(path):
+    if os.path.exists(path):
+        with open(path, 'r') as file:
+            return file.readlines()
+    else:
+        return []
+
+
+def diff_files(from_file, to_file, filename):
+    diff = difflib.unified_diff(from_file, to_file, fromfile='Old {}'.format(filename), tofile='New {}'.format(filename))
+    for line in diff:
+        sys.stdout.write(line)
 
 
 if __name__ == '__main__':

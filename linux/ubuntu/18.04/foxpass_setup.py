@@ -26,6 +26,7 @@
 
 import argparse
 from datetime import datetime
+import difflib
 import os
 import re
 import sys
@@ -46,16 +47,40 @@ def main():
     parser.add_argument('--idle-timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
-    parser.add_argument('--require-sudoers-pw',
-                        default=False,
-                        action='store_true',
-                        help='set sudoers default password requirement')
+    parser.add_argument('--require-sudoers-pw', default=False, action='store_true', help='set sudoers default password requirement')
+    parser.add_argument('--debug', default=False, action='store_true', help='Turn on debug mode')
+    # Foxpass SUDOers add-on
+    parser.add_argument('--enable-ldap-sudoers', default=False, action='store_true', help='Enable Foxpass SUDOers')
+    parser.add_argument('--sudoers-timed', default=False, action='store_true', help='Toggle sudoers_timed parameter')
+    parser.add_argument('--bind-timelimit', default=30, help='The amount of time, in seconds, to wait while trying to connect to an LDAP server.')
+    parser.add_argument('--query-timelimit', default=30, help='The amount of time, in seconds, to wait while performing an LDAP query.')
 
     args = parser.parse_args()
 
     binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
     uris = [args.ldap_uri] + args.ldaps
+
+    if args.debug:
+        foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
+        nslcd_path = '/etc/nslcd.conf'
+        sshd_config_path = '/etc/ssh/sshd_config'
+        cs_path = '/etc/pam.d/common-session'
+        csn_path = '/etc/pam.d/common-session-noninteractive'
+        nsswitch_path = '/etc/nsswitch.conf'
+        sudoers_path = '/etc/sudoers'
+        foxpass_sudo_path = '/etc/sudoers.d/95-foxpass-sudo'
+        sudo_ldap_path = '/etc/sudo-ldap.conf'
+
+        from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        from_file_nslcd = open_file(nslcd_path)
+        from_file_sshd_config = open_file(sshd_config_path)
+        from_file_cs = open_file(cs_path)
+        from_file_csn = open_file(csn_path)
+        from_file_nsswitch = open_file(nsswitch_path)
+        from_sudoers_file = open_file(sudoers_path)
+        from_foxpass_sudo_file = open_file(foxpass_sudo_path)
+        from_file_sudo_ldap = open_file(sudo_ldap_path)
 
     apt_get_update()
     install_dependencies()
@@ -65,6 +90,31 @@ def main():
     augment_pam()
     fix_nsswitch()
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
+
+    if args.enable_ldap_sudoers:
+        write_ldap_sudoers(uris, args.base_dn, binddn, args.bind_pw, args.sudoers_timed, args.bind_timelimit, args.query_timelimit)
+
+    if args.debug:
+        to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        to_file_nslcd = open_file(nslcd_path)
+        to_file_sshd_config = open_file(sshd_config_path)
+        to_file_cs = open_file(cs_path)
+        to_file_csn = open_file(csn_path)
+        to_file_nsswitch = open_file(nsswitch_path)
+        to_sudoers_file = open_file(sudoers_path)
+        to_foxpass_sudo_file = open_file(foxpass_sudo_path)
+        to_file_sudo_ldap = open_file(sudo_ldap_path)
+
+        diff_files(from_file_foxpass_ssh_keys, to_file_foxpass_ssh_keys, foxpass_ssh_keys_path)
+        diff_files(from_file_nslcd, to_file_nslcd, nslcd_path)
+        diff_files(from_file_sshd_config, to_file_sshd_config, sshd_config_path)
+        diff_files(from_file_cs, to_file_cs, cs_path)
+        diff_files(from_file_csn, to_file_csn, csn_path)
+        diff_files(from_file_nsswitch, to_file_nsswitch, nsswitch_path)
+        diff_files(from_sudoers_file, to_sudoers_file, sudoers_path)
+        diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, foxpass_sudo_path)
+        diff_files(from_file_sudo_ldap, to_file_sudo_ldap, sudo_ldap_path)
+
     restart()
 
 
@@ -221,6 +271,52 @@ def fix_nsswitch():
     os.system("sed -i 's/shadow:.*/shadow:         compat ldap/' /etc/nsswitch.conf")
 
 
+def write_ldap_sudoers(uris, basedn, binddn, bindpw, sudoers_timed, bind_timelimit, query_timelimit):
+    check_sudo_passwd()
+    return_code = os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y sudo-ldap')
+    if return_code != 0:
+        # bitshift right 8 to get rid of the signal portion of the return code
+        sys.exit(return_code >> 8)
+    with open('/etc/sudo-ldap.conf', "w") as w:
+        content = """\
+#
+# LDAP Defaults
+#
+
+# See ldap.conf(5) for details
+# This file should be world readable but not world writable.
+
+URI         {uri}
+BINDDN      {binddn}
+BINDPW      {bindpw}
+
+# The amount of time, in seconds, to wait while trying to connect to
+# an LDAP server.
+bind_timelimit {bind_timelimit}
+#
+# The amount of time, in seconds, to wait while performing an LDAP query.
+timelimit {query_timelimit}
+#
+# Must be set or sudo will ignore LDAP; may be specified multiple times.
+sudoers_base   ou=SUDOers,{basedn}
+#
+# verbose sudoers matching from ldap
+sudoers_debug 0
+#
+# Enable support for time-based entries in sudoers.
+sudoers_timed {sudoers_timed}
+
+#SIZELIMIT      12
+#TIMELIMIT      15
+#DEREF          never
+
+# TLS certificates (needed for GnuTLS)
+TLS_CACERT      /etc/ssl/certs/ca-certificates.crt
+"""
+        w.write(content.format(uri=uris[0], basedn=basedn, binddn=binddn, bindpw=bindpw,
+            sudoers_timed=str(sudoers_timed).lower(), bind_timelimit=bind_timelimit, query_timelimit=query_timelimit))
+
+
 # give "sudo" and chosen sudoers groups sudo permissions without password
 def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
     if not file_contains('/etc/sudoers', r'^#includedir /etc/sudoers.d'):
@@ -234,6 +330,12 @@ def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
                     format(sudo=sudoers, command='ALL' if require_sudoers_pw else 'NOPASSWD:ALL'))
     if not require_sudoers_pw:
         os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
+
+
+def check_sudo_passwd():
+    result = os.popen('passwd --status root').read().split(' ')
+    if result and result[1] != 'P':
+        sys.exit('Please set the password of the `root` user before enabling ldap sudoers. E.g sudo passwd root')
 
 
 def restart():
@@ -269,6 +371,20 @@ def is_ec2_host_imds_v1_fallback():
         return True
     except Exception:
         return False
+
+
+def open_file(path):
+    if os.path.exists(path):
+        with open(path, 'r') as file:
+            return file.readlines()
+    else:
+        return []
+
+
+def diff_files(from_file, to_file, filename):
+    diff = difflib.unified_diff(from_file, to_file, fromfile='Old {}'.format(filename), tofile='New {}'.format(filename))
+    for line in diff:
+        sys.stdout.write(line)
 
 
 if __name__ == '__main__':

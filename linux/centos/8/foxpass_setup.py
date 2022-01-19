@@ -26,6 +26,7 @@
 
 import argparse
 from datetime import datetime
+import difflib
 import os
 import re
 import sys
@@ -45,16 +46,36 @@ def main():
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
-    parser.add_argument('--require-sudoers-pw',
-                        default=False,
-                        action='store_true',
-                        help='set sudoers default password requirement')
+    parser.add_argument('--require-sudoers-pw', default=False, action='store_true', help='set sudoers default password requirement')
     parser.add_argument('--opt-timeout', default=6, help='option to set the sssd opt timeout')
+    parser.add_argument('--debug', default=False, action='store_true', help='Turn on debug mode')
+    # Foxpass SUDOers add-on
+    parser.add_argument('--enable-ldap-sudoers', default=False, action='store_true', help='Enable Foxpass SUDOers')
+    parser.add_argument('--sudo-timed', default=False, action='store_true', help='Toggle sudo_timed parameter')
+    parser.add_argument('--full-refresh-interval', default=21600, help='In hours, default is 6 hours')
+    parser.add_argument('--smart-refresh-interval', default=900, help='In minutes, default is 15 minutes')
 
     args = parser.parse_args()
 
     bind_dn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
+
+    if args.debug:
+        foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
+        sssd_path = '/etc/sssd/conf.d/authconfig-sssd.conf'
+        sshd_config_path = '/etc/ssh/sshd_config'
+        ldap_path = '/etc/openldap/ldap.conf'
+        nsswitch_path = '/etc/nsswitch.conf'
+        sudoers_path = '/etc/sudoers'
+        foxpass_sudo_path = '/etc/sudoers.d/95-foxpass-sudo'
+
+        from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        from_file_sssd = open_file(sssd_path)
+        from_file_sshd_config = open_file(sshd_config_path)
+        from_file_ldap = open_file(ldap_path)
+        from_file_nsswitch = open_file(nsswitch_path)
+        from_sudoers_file = open_file(sudoers_path)
+        from_foxpass_sudo_file = open_file(foxpass_sudo_path)
 
     install_dependencies()
     write_foxpass_ssh_keys_script(apis, args.api_key)
@@ -62,6 +83,26 @@ def main():
     configure_sssd(bind_dn, args.bind_pw, args.ldaps, args.opt_timeout)
     augment_sshd_config()
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
+
+    if args.enable_ldap_sudoers:
+        configure_ldap_sudoers(args.base_dn, args.sudo_timed, args.full_refresh_interval, args.smart_refresh_interval)
+
+    if args.debug:
+        to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        to_file_sssd = open_file(sssd_path)
+        to_file_sshd_config = open_file(sshd_config_path)
+        to_file_ldap = open_file(ldap_path)
+        to_file_nsswitch = open_file(nsswitch_path)
+        to_sudoers_file = open_file(sudoers_path)
+        to_foxpass_sudo_file = open_file(foxpass_sudo_path)
+
+        diff_files(from_file_foxpass_ssh_keys, to_file_foxpass_ssh_keys, foxpass_ssh_keys_path)
+        diff_files(from_file_sssd, to_file_sssd, sssd_path)
+        diff_files(from_file_sshd_config, to_file_sshd_config, sshd_config_path)
+        diff_files(from_file_ldap, to_file_ldap, ldap_path)
+        diff_files(from_file_nsswitch, to_file_nsswitch, nsswitch_path)
+        diff_files(from_sudoers_file, to_sudoers_file, sudoers_path)
+        diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, foxpass_sudo_path)
 
     # sleep to the next second to make sure sssd.conf has a new timestamp
     time.sleep(1)
@@ -125,7 +166,7 @@ exit $?
 
         # give permissions only to root to protect the API key inside
         os.system('chmod 700 /usr/local/sbin/foxpass_ssh_keys.sh')
-
+    
 
 def run_authconfig(uri, base_dn):
     cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=uri, base_dn=base_dn)
@@ -161,12 +202,50 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps, opt_timeout):
     sssdconfig.write()
 
 
+def configure_ldap_sudoers(base_dn, sudo_timed, full_refresh_interval, smart_refresh_interval):
+    from SSSDConfig import SSSDConfig
+    sssdconfig = SSSDConfig()
+    sssdconfig.import_config('/etc/sssd/conf.d/authconfig-sssd.conf')
+
+    try:
+        sssdconfig.new_service('sudo')
+        sssdconfig.activate_service('sudo')
+    except:
+        pass
+
+    domain = sssdconfig.get_domain('default')
+    domain.add_provider('ldap', 'sudo')
+    domain.set_option('ldap_sudo_search_base', 'ou=SUDOers,{}'.format(base_dn))
+    domain.set_option('ldap_sudo_full_refresh_interval', full_refresh_interval)
+    domain.set_option('ldap_sudo_smart_refresh_interval', smart_refresh_interval)
+
+    sssdconfig.activate_service('sudo')
+    sssdconfig.set('sudo', 'sudo_timed', str(sudo_timed).lower())
+    sssdconfig.save_domain(domain)
+    sssdconfig.write()
+
+    augment_openldap(base_dn)
+    augment_nsswitch()
+
+
 def augment_sshd_config():
     if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand\w'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
             w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
             w.write("AuthorizedKeysCommandUser\troot\n")
+
+
+def augment_openldap(bind_dn):
+    if not file_contains('/etc/openldap/ldap.conf', r'^SUDOERS_BASE'):
+        with open('/etc/openldap/ldap.conf', "a") as w:
+            w.write("\nSUDOERS_BASE ou=SUDOers,{}".format(bind_dn))
+
+
+def augment_nsswitch():
+    if not file_contains('/etc/nsswitch.conf', r'^sudoers:'):
+        with open('/etc/nsswitch.conf', "a") as w:
+            w.write("sudoers: files sss")
 
 
 # give "wheel" and chosen sudoers groups sudo permissions without password
@@ -215,6 +294,20 @@ def is_ec2_host_imds_v1_fallback():
         return True
     except Exception:
         return False
+
+
+def open_file(path):
+    if os.path.exists(path):
+        with open(path, 'r') as file:
+            return file.readlines()
+    else:
+        return []
+
+
+def diff_files(from_file, to_file, filename):
+    diff = difflib.unified_diff(from_file, to_file, fromfile='Old {}'.format(filename), tofile='New {}'.format(filename))
+    for line in diff:
+        sys.stdout.write(line)
 
 
 if __name__ == '__main__':

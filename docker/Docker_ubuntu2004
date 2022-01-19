@@ -1,0 +1,16 @@
+FROM ubuntu:20.04
+
+ARG API_KEY
+ARG BASE_DN
+ARG BIND_USER
+ARG BIND_PASSWORD
+
+ENV DEBIAN_FRONTEND=noninteractive 
+
+RUN apt-get -y update && apt-get -y install python3-pip openssh-server sudo
+RUN pip install urllib3
+RUN echo 'root:root' | chpasswd
+
+COPY linux/ubuntu/20.04/foxpass_setup.py /
+
+ENTRYPOINT python3 foxpass_setup.py --base-dn ${BASE_DN} --bind-user ${BIND_USER} --bind-pw ${BIND_PASSWORD} --api-key ${API_KEY} --enable-ldap-sudoers --debug
