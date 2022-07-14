@@ -116,7 +116,7 @@ def write_foxpass_ssh_keys_script(apis, api_key):
 user="$1"
 secret="%s"
 hostname=`hostname`
-if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
 aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
 aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 %s
@@ -131,7 +131,7 @@ exit $?
 user="$1"
 secret="%s"
 hostname=`hostname`
-if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
 %s
 exit $?
 """

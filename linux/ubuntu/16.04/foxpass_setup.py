@@ -111,7 +111,7 @@ def write_foxpass_ssh_keys_script(apis, api_key):
 user="$1"
 secret="%s"
 hostname=`hostname`
-if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
 
 aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
 if [ -z "$aws_token" ]
@@ -135,7 +135,7 @@ exit $?
 user="$1"
 secret="%s"
 hostname=`hostname`
-if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
 %s
 exit $?
 """
