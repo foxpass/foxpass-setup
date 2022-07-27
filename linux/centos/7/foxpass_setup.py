@@ -52,8 +52,8 @@ def main():
     # Foxpass SUDOers add-on
     parser.add_argument('--enable-ldap-sudoers', default=False, action='store_true', help='Enable Foxpass SUDOers')
     parser.add_argument('--sudo-timed', default=False, action='store_true', help='Toggle sudo_timed parameter')
-    parser.add_argument('--full-refresh-interval', default=21600, help='In hours, default is 6 hours')
-    parser.add_argument('--smart-refresh-interval', default=900, help='In minutes, default is 15 minutes')
+    parser.add_argument('--full-refresh-interval', default=21600, help='Default is 6 hours in seconds')
+    parser.add_argument('--smart-refresh-interval', default=900, help='Default is 15 minutes in seconds')
 
     args = parser.parse_args()
 
