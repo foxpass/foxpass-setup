@@ -255,7 +255,7 @@ def augment_sshd_config(allow_authorized_keys_for):
             w.write("\n")
             w.write("AuthorizedKeysFile\tnoner\n")
     else:
-        os.system("sed -i 's/^AuthorizedKeysFile.*/AuthorizedKeysFile    noner/' /etc/ssh/sshd_config")
+        os.system("sed -i 's/^AuthorizedKeysFile.*/AuthorizedKeysFile\tnoner/' /etc/ssh/sshd_config")
 
     if not file_contains('/etc/ssh/sshd_config', r'^Match User'):
         with open('/etc/ssh/sshd_config', "a") as w:
