@@ -48,7 +48,7 @@ def main():
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
     parser.add_argument('--require-sudoers-pw', default=False, action='store_true', help='set sudoers default password requirement')
-    parser.add_argument('--allow-authorized-keys-for', default='*', type=str, help='allow root authorized keys for a given user')
+    parser.add_argument('--allow-authorized-keys-for', default='*', type=str, help='allow authorized keys for any given user, by default all users are allowed.')
     parser.add_argument('--debug', default=False, action='store_true', help='Turn on debug mode')
     # Foxpass SUDOers add-on
     parser.add_argument('--enable-ldap-sudoers', default=False, action='store_true', help='Enable Foxpass SUDOers')
