@@ -48,6 +48,7 @@ def main():
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
     parser.add_argument('--require-sudoers-pw', default=False, action='store_true', help='set sudoers default password requirement')
+    parser.add_argument('--allow-authorized-keys-for', default='*', type=str, help='allowed root authorized ssh keys for a given user')
     parser.add_argument('--debug', default=False, action='store_true', help='Turn on debug mode')
     # Foxpass SUDOers add-on
     parser.add_argument('--enable-ldap-sudoers', default=False, action='store_true', help='Enable Foxpass SUDOers')
@@ -86,7 +87,7 @@ def main():
     install_dependencies()
     write_foxpass_ssh_keys_script(apis, args.api_key)
     write_nslcd_conf(uris, args.base_dn, binddn, args.bind_pw, args.ldap_connections, args.idle_timelimit)
-    augment_sshd_config()
+    augment_sshd_config(args.allow_authorized_keys_for)
     augment_pam()
     fix_nsswitch()
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
@@ -248,7 +249,23 @@ nss_initgroups_ignoreusers ALLLOCAL
                                bindpw=bindpw, sslstatus=sslstatus, threads=threads, idle_timelimit=idle_timelimit))
 
 
-def augment_sshd_config():
+def augment_sshd_config(allow_authorized_keys_for):
+    if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysFile'):
+        with open('/etc/ssh/sshd_config', "a") as w:
+            w.write("\n")
+            w.write("AuthorizedKeysFile\tnoner\n")
+    else:
+        os.system("sed -i 's/^AuthorizedKeysFile.*/AuthorizedKeysFile    noner/' /etc/ssh/sshd_config")
+
+    if not file_contains('/etc/ssh/sshd_config', r'^Match User'):
+        with open('/etc/ssh/sshd_config', "a") as w:
+            w.write("\n")
+            w.write("Match User {}\n".format(allow_authorized_keys_for))
+            w.write("\tAuthorizedKeysFile ./ssh/authorized_keys\n")
+
+    # dynamically update the Match User value
+    os.system("sed -i 's/^Match User.*/Match User {}/' /etc/ssh/sshd_config".format(allow_authorized_keys_for))
+
     if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand\w'):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
