@@ -261,7 +261,7 @@ def augment_sshd_config(allow_authorized_keys_file_for):
         with open('/etc/ssh/sshd_config', "a") as w:
             w.write("\n")
             w.write("Match User {}\n".format(allow_authorized_keys_file_for))
-            w.write("\tAuthorizedKeysFile ./ssh/authorized_keys\n")
+            w.write("\tAuthorizedKeysFile .ssh/authorized_keys\n")
 
     # dynamically update the Match User value
     os.system("sed -i 's/^Match User.*/Match User {}/' /etc/ssh/sshd_config".format(allow_authorized_keys_file_for))
