@@ -393,13 +393,13 @@ def file_contains(filename, pattern):
 
 
 def is_gce_host():
+    http = urllib3.PoolManager(timeout=.1)
+    url = 'http://metadata.google.internal/computeMetadata/v1/instance/'
     try:
-        http = urllib3.PoolManager(timeout=.1)
-        response = http.request('GET', 'http://metadata.google.internal/computeMetadata/v1/instance/', headers={"Metadata-Flavor": "Google"})
-        try:
-            return response.headers.get("Metadata-Flavor") == "Google"
-        finally:
-            pass
+        r = http.request('GET', url, headers={"Metadata-Flavor": "Google"})
+        if r.status != 200:
+            raise Exception
+        return True
     except Exception:
             return False
 
@@ -409,7 +409,7 @@ def is_ec2_host():
     url = 'http://169.254.169.254/latest/api/token'
     try:
         r = http.request('PUT', url)
-        if r.status_code != 200:
+        if r.status != 200:
             raise Exception
         return True
     except Exception:
@@ -421,7 +421,7 @@ def is_ec2_host_imds_v1_fallback():
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = http.request('GET', url)
-        if r.status_code != 200:
+        if r.status != 200:
             raise Exception
         return True
     except Exception:
