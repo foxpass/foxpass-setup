@@ -177,7 +177,7 @@ fi
 exit $?
 """
         elif is_gce_host():
-            append = '&provider=gce&gce_instance_id={gce_instance_id}&gce_zone={gce_zone}&gce_project_id={gce_project_id}{gce_networks}{gce_network_tags}" 2>/dev/null'
+            append = '&provider=gce&gce_instance_id=${gce_instance_id}&gce_zone=${gce_zone}&gce_project_id=${gce_project_id}${gce_networks}${gce_network_tags}" 2>/dev/null'
             curls = [curl + append for curl in curls]
             contents = """\
 #!/bin/bash
