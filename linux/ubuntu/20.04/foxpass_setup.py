@@ -189,11 +189,12 @@ if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
 gce_instance_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/id`
 gce_zone=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/zone`
 gce_project_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/project/project-id`
-networks=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/?alt=text`)
+networks=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/`)
 gce_networks=''
 for gce_network in "${networks[@]}"
 do
-    gce_networks=${gce_networks}"&gce_networks[]"=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
+    gce_network=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
+    gce_networks=${gce_networks}"&gce_networks[]"=${gce_network}
 done
 network_tags=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text`)
 gce_network_tags=''
