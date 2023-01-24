@@ -149,6 +149,35 @@ fi
 %s
 exit $?
 """
+        elif is_gce_host():
+            append = '&provider=gce&gce_instance_id=${gce_instance_id}&gce_zone=${gce_zone}&gce_project_id=${gce_project_id}${gce_networks}${gce_network_tags}" 2>/dev/null'
+            curls = [curl + append for curl in curls]
+            contents = """\
+#!/bin/bash
+user="$1"
+secret="%s"
+hostname=`hostname`
+headers="Metadata-Flavor: Google"
+if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
+gce_instance_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/id`
+gce_zone=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/zone`
+gce_project_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/project/project-id`
+networks=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/`)
+gce_networks=''
+for gce_network in "${networks[@]}"
+do
+    gce_network=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
+    gce_networks=${gce_networks}"&gce_networks[]"=${gce_network}
+done
+network_tags=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text`)
+gce_network_tags=''
+for gce_network_tag in "${network_tags[@]}"
+do
+    gce_network_tags=${gce_network_tags}"&gce_network_tags[]"=${gce_network_tag}
+done
+%s
+exit $?
+"""
         else:
             append = '" 2>/dev/null'
             curls = [curl + append for curl in curls]
@@ -276,11 +305,25 @@ def file_contains(filename, pattern):
     return False
 
 
+def is_gce_host():
+    http = urllib3.PoolManager(timeout=.1)
+    url = 'http://metadata.google.internal/computeMetadata/v1/instance/'
+    try:
+        r = http.request('GET', url, headers={"Metadata-Flavor": "Google"})
+        if r.status != 200:
+            raise Exception
+        return True
+    except Exception:
+            return False
+
+
 def is_ec2_host():
     http = urllib3.PoolManager(timeout=.1)
     url = 'http://169.254.169.254/latest/api/token'
     try:
         r = http.request('PUT', url)
+        if r.status != 200:
+            raise Exception
         return True
     except Exception:
         return is_ec2_host_imds_v1_fallback()
@@ -291,6 +334,8 @@ def is_ec2_host_imds_v1_fallback():
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = http.request('GET', url)
+        if r.status != 200:
+            raise Exception
         return True
     except Exception:
         return False

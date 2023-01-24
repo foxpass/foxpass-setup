@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Copyright (c) 2015-present, Foxpass, Inc.
+# Copyright (c) 2016-present, Foxpass, Inc.
 # All rights reserved.
 #
 #
@@ -30,6 +30,7 @@ import difflib
 import os
 import re
 import sys
+import time
 import urllib3
 
 
@@ -43,106 +44,78 @@ def main():
     parser.add_argument('--secondary-ldap', dest='ldaps', default=[], action='append', help='Secondary LDAP Server(s)')
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
-    parser.add_argument('--ldap-connections', default=2, type=int, help='Number of connections to make to LDAP server.')
-    parser.add_argument('--idle-timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
     parser.add_argument('--require-sudoers-pw', default=False, action='store_true', help='set sudoers default password requirement')
+    parser.add_argument('--opt-timeout', default=6, help='option to set the sssd opt timeout')
     parser.add_argument('--debug', default=False, action='store_true', help='Turn on debug mode')
     # Foxpass SUDOers add-on
     parser.add_argument('--enable-ldap-sudoers', default=False, action='store_true', help='Enable Foxpass SUDOers')
-    parser.add_argument('--sudoers-timed', default=False, action='store_true', help='Toggle sudoers_timed parameter')
-    parser.add_argument('--bind-timelimit', default=30, help='The amount of time, in seconds, to wait while trying to connect to an LDAP server.')
-    parser.add_argument('--query-timelimit', default=30, help='The amount of time, in seconds, to wait while performing an LDAP query.')
+    parser.add_argument('--sudo-timed', default=False, action='store_true', help='Toggle sudo_timed parameter')
+    parser.add_argument('--full-refresh-interval', default=21600, help='Default is 6 hours in seconds')
+    parser.add_argument('--smart-refresh-interval', default=900, help='Default is 15 minutes in seconds')
 
     args = parser.parse_args()
 
-    binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
+    bind_dn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
-    uris = [args.ldap_uri] + args.ldaps
 
     if args.debug:
         foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
-        nslcd_path = '/etc/nslcd.conf'
+        sssd_path = '/etc/sssd/sssd.conf'
         sshd_config_path = '/etc/ssh/sshd_config'
-        cs_path = '/etc/pam.d/common-session'
-        csn_path = '/etc/pam.d/common-session-noninteractive'
+        ldap_path = '/etc/openldap/ldap.conf'
         nsswitch_path = '/etc/nsswitch.conf'
         sudoers_path = '/etc/sudoers'
         foxpass_sudo_path = '/etc/sudoers.d/95-foxpass-sudo'
-        sudo_ldap_path = '/etc/sudo-ldap.conf'
 
         from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
-        from_file_nslcd = open_file(nslcd_path)
+        from_file_sssd = open_file(sssd_path)
         from_file_sshd_config = open_file(sshd_config_path)
-        from_file_cs = open_file(cs_path)
-        from_file_csn = open_file(csn_path)
+        from_file_ldap = open_file(ldap_path)
         from_file_nsswitch = open_file(nsswitch_path)
         from_sudoers_file = open_file(sudoers_path)
         from_foxpass_sudo_file = open_file(foxpass_sudo_path)
-        from_file_sudo_ldap = open_file(sudo_ldap_path)
 
-    apt_get_update()
     install_dependencies()
     write_foxpass_ssh_keys_script(apis, args.api_key)
-    write_nslcd_conf(uris, args.base_dn, binddn, args.bind_pw, args.ldap_connections, args.idle_timelimit)
+    run_authconfig(args.ldap_uri, args.base_dn)
+    configure_sssd(bind_dn, args.bind_pw, args.ldaps, args.opt_timeout)
     augment_sshd_config()
-    augment_pam()
-    fix_nsswitch()
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
-    fix_eic()
 
     if args.enable_ldap_sudoers:
-        write_ldap_sudoers(uris, args.base_dn, binddn, args.bind_pw, args.sudoers_timed, args.bind_timelimit, args.query_timelimit)
+        configure_ldap_sudoers(args.base_dn, args.sudo_timed, args.full_refresh_interval, args.smart_refresh_interval)
 
     if args.debug:
         to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
-        to_file_nslcd = open_file(nslcd_path)
+        to_file_sssd = open_file(sssd_path)
         to_file_sshd_config = open_file(sshd_config_path)
-        to_file_cs = open_file(cs_path)
-        to_file_csn = open_file(csn_path)
+        to_file_ldap = open_file(ldap_path)
         to_file_nsswitch = open_file(nsswitch_path)
         to_sudoers_file = open_file(sudoers_path)
         to_foxpass_sudo_file = open_file(foxpass_sudo_path)
-        to_file_sudo_ldap = open_file(sudo_ldap_path)
 
         diff_files(from_file_foxpass_ssh_keys, to_file_foxpass_ssh_keys, foxpass_ssh_keys_path)
-        diff_files(from_file_nslcd, to_file_nslcd, nslcd_path)
+        diff_files(from_file_sssd, to_file_sssd, sssd_path)
         diff_files(from_file_sshd_config, to_file_sshd_config, sshd_config_path)
-        diff_files(from_file_cs, to_file_cs, cs_path)
-        diff_files(from_file_csn, to_file_csn, csn_path)
+        diff_files(from_file_ldap, to_file_ldap, ldap_path)
         diff_files(from_file_nsswitch, to_file_nsswitch, nsswitch_path)
         diff_files(from_sudoers_file, to_sudoers_file, sudoers_path)
         diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, foxpass_sudo_path)
-        diff_files(from_file_sudo_ldap, to_file_sudo_ldap, sudo_ldap_path)
+
+    # sleep to the next second to make sure sssd.conf has a new timestamp
+    time.sleep(1)
+    # touch the sssd conf file again making sure it is 0600 and owned by root:root
+    os.system('touch /etc/sssd/conf.d/authconfig-sssd.conf')
+    os.system('chmod 0600 /etc/sssd/conf.d/authconfig-sssd.conf')
 
     restart()
 
 
-def apt_get_update():
-    # This section requires that the update-notifier package be installed.
-    update_notifier_file = '/var/lib/apt/periodic/update-success-stamp'
-    notifier_file_exists = os.path.exists(update_notifier_file)
-
-    if not notifier_file_exists:
-        # No way to check last apt-get update, so we always run.
-        os.system('apt-get update')
-    else:
-        # Otherwise only if it hasn't been updated in over 7 days.
-        now = datetime.now()
-        apt_cache_age = datetime.fromtimestamp(os.stat(update_notifier_file).st_mtime)
-        delta = now - apt_cache_age
-        if delta.days > 7:
-            os.system('apt-get update')
-
-
 def install_dependencies():
-    # install dependencies, without the fancy ui
-    # capture the return code and exit passing the code if apt-get fails
-    return_code = os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y curl libnss-ldapd nscd nslcd')
-    if return_code != 0:
-        # bitshift right 8 to get rid of the signal portion of the return code
-        sys.exit(return_code >> 8)
+    # install dependencies
+    os.system('yum install -y sssd authconfig')
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
@@ -161,7 +134,7 @@ def write_foxpass_ssh_keys_script(apis, api_key):
 user="$1"
 secret="%s"
 hostname=`hostname`
-if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
 
 aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
 if [ -z "$aws_token" ]
@@ -213,8 +186,8 @@ exit $?
 
 user="$1"
 secret="%s"
-hostname=`hostname`
-if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
+hostname=`uname -n`
+if grep -q "^${user/./\\.}:" /etc/passwd; then exit; fi
 %s
 exit $?
 """
@@ -222,59 +195,66 @@ exit $?
 
         # give permissions only to root to protect the API key inside
         os.system('chmod 700 /usr/local/sbin/foxpass_ssh_keys.sh')
+    
+
+def run_authconfig(uri, base_dn):
+    cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=uri, base_dn=base_dn)
+    print('Running %s' % cmd)
+    os.system(cmd)
 
 
-# write nslcd.conf, with substutions
-def write_nslcd_conf(uris, basedn, binddn, bindpw, threads, idle_timelimit):
-    with open('/etc/nslcd.conf', "w") as w:
-        content = """\
-# /etc/nslcd.conf
-# nslcd configuration file. See nslcd.conf(5)
-# for details.
+def configure_sssd(bind_dn, bind_pw, backup_ldaps, opt_timeout):
+    from SSSDConfig import SSSDConfig
 
-# number of threads. one LDAP connction per thread.
-threads {threads}
+    sssdconfig = SSSDConfig()
+    sssdconfig.import_config('/etc/sssd/sssd.conf')
 
-# Set how long to keep ldap connections to foxpass open.
-# By default Foxpass sets this to 600s.
-idle_timelimit {idle_timelimit}
+    sssdconfig.new_service('pam')
+    sssdconfig.new_service('nss')
+    sssdconfig.activate_service('pam')
+    sssdconfig.activate_service('nss')
+    domain = sssdconfig.get_domain('default')
+    domain.add_provider('ldap', 'id')
+    if backup_ldaps:
+        domain.set_option('ldap_backup_uri', ','.join(backup_ldaps))
+    domain.set_option('ldap_tls_reqcert', 'demand')
+    domain.set_option('ldap_tls_cacert', '/etc/ssl/certs/ca-bundle.crt')
+    domain.set_option('ldap_default_bind_dn', bind_dn)
+    domain.set_option('ldap_default_authtok', bind_pw)
+    domain.set_option('ldap_opt_timeout', opt_timeout)
+    domain.set_option('enumerate', True)
+    domain.remove_option('ldap_tls_cacertdir')
 
-# The user and group nslcd should run as.
-uid nslcd
-gid nslcd
+    domain.set_active(True)
 
-# The location at which the LDAP server(s) should be reachable.
-uri {uris}
+    sssdconfig.save_domain(domain)
+    sssdconfig.write()
 
-# The search base that will be used for all queries.
-base {basedn}
 
-# The LDAP protocol version to use.
-#ldap_version 3
+def configure_ldap_sudoers(base_dn, sudo_timed, full_refresh_interval, smart_refresh_interval):
+    from SSSDConfig import SSSDConfig
+    sssdconfig = SSSDConfig()
+    sssdconfig.import_config('/etc/sssd/sssd.conf')
 
-# The DN to bind with for normal lookups.
-binddn {binddn}
-bindpw {bindpw}
+    try:
+        sssdconfig.new_service('sudo')
+        sssdconfig.activate_service('sudo')
+    except:
+        pass
 
-# The DN used for password modifications by root.
-#rootpwmoddn cn=admin,dc=example,dc=com
+    domain = sssdconfig.get_domain('default')
+    domain.add_provider('ldap', 'sudo')
+    domain.set_option('ldap_sudo_search_base', 'ou=SUDOers,{}'.format(base_dn))
+    domain.set_option('ldap_sudo_full_refresh_interval', full_refresh_interval)
+    domain.set_option('ldap_sudo_smart_refresh_interval', smart_refresh_interval)
 
-# SSL options
-ssl {sslstatus}
-tls_reqcert demand
-tls_cacertfile /etc/ssl/certs/ca-certificates.crt
+    sssdconfig.activate_service('sudo')
+    sssdconfig.set('sudo', 'sudo_timed', str(sudo_timed).lower())
+    sssdconfig.save_domain(domain)
+    sssdconfig.write()
 
-# The search scope.
-#scope sub
-
-# don't use LDAP for any users defined in /etc/passwd
-nss_initgroups_ignoreusers ALLLOCAL
-"""
-        sslstatus = 'off'
-        if uris[0].startswith('ldaps://'):
-            sslstatus = 'on'
-        w.write(content.format(uris='\nuri '.join(uris), basedn=basedn, binddn=binddn,
-                               bindpw=bindpw, sslstatus=sslstatus, threads=threads, idle_timelimit=idle_timelimit))
+    augment_openldap(base_dn)
+    augment_nsswitch()
 
 
 def augment_sshd_config():
@@ -285,68 +265,19 @@ def augment_sshd_config():
             w.write("AuthorizedKeysCommandUser\troot\n")
 
 
-def augment_pam():
-    if not file_contains('/etc/pam.d/common-session', r'pam_mkhomedir\.so'):
-        with open('/etc/pam.d/common-session', "a") as w:
-            w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
-
-    if not file_contains('/etc/pam.d/common-session-noninteractive', r'pam_mkhomedir\.so'):
-        with open('/etc/pam.d/common-session-noninteractive', "a") as w:
-            w.write('session required                        pam_mkhomedir.so umask=0022 skel=/etc/skel\n')
+def augment_openldap(bind_dn):
+    if not file_contains('/etc/openldap/ldap.conf', r'^SUDOERS_BASE'):
+        with open('/etc/openldap/ldap.conf', "a") as w:
+            w.write("\nSUDOERS_BASE ou=SUDOers,{}".format(bind_dn))
 
 
-def fix_nsswitch():
-    os.system("sed -i 's/passwd:.*/passwd:         compat ldap/' /etc/nsswitch.conf")
-    os.system("sed -i 's/group:.*/group:          compat ldap/' /etc/nsswitch.conf")
-    os.system("sed -i 's/shadow:.*/shadow:         compat ldap/' /etc/nsswitch.conf")
-
-def write_ldap_sudoers(uris, basedn, binddn, bindpw, sudoers_timed, bind_timelimit, query_timelimit):
-    check_sudo_passwd()
-    return_code = os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y sudo-ldap')
-    if return_code != 0:
-        # bitshift right 8 to get rid of the signal portion of the return code
-        sys.exit(return_code >> 8)
-    with open('/etc/sudo-ldap.conf', "w") as w:
-        content = """\
-#
-# LDAP Defaults
-#
-
-# See ldap.conf(5) for details
-# This file should be world readable but not world writable.
-
-URI         {uri}
-BINDDN      {binddn}
-BINDPW      {bindpw}
-
-# The amount of time, in seconds, to wait while trying to connect to
-# an LDAP server.
-bind_timelimit {bind_timelimit}
-#
-# The amount of time, in seconds, to wait while performing an LDAP query.
-timelimit {query_timelimit}
-#
-# Must be set or sudo will ignore LDAP; may be specified multiple times.
-sudoers_base   ou=SUDOers,{basedn}
-#
-# verbose sudoers matching from ldap
-sudoers_debug 0
-#
-# Enable support for time-based entries in sudoers.
-sudoers_timed {sudoers_timed}
-
-#SIZELIMIT      12
-#TIMELIMIT      15
-#DEREF          never
-
-# TLS certificates (needed for GnuTLS)
-TLS_CACERT      /etc/ssl/certs/ca-certificates.crt
-"""
-        w.write(content.format(uri=uris[0], basedn=basedn, binddn=binddn, bindpw=bindpw,
-            sudoers_timed=str(sudoers_timed).lower(), bind_timelimit=bind_timelimit, query_timelimit=query_timelimit))
+def augment_nsswitch():
+    if not file_contains('/etc/nsswitch.conf', r'^sudoers:'):
+        with open('/etc/nsswitch.conf', "a") as w:
+            w.write("sudoers: files sss")
 
 
-# give "sudo" and chosen sudoers groups sudo permissions without password
+# give "wheel" and chosen sudoers groups sudo permissions without password
 def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
     if not file_contains('/etc/sudoers', r'^#includedir /etc/sudoers.d'):
         with open('/etc/sudoers', 'a') as w:
@@ -358,31 +289,12 @@ def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
             w.write('# Adding Foxpass group to sudoers\n%{sudo} ALL=(ALL:ALL) {command}'.
                     format(sudo=sudoers, command='ALL' if require_sudoers_pw else 'NOPASSWD:ALL'))
     if not require_sudoers_pw:
-        os.system("sed -i 's/^%sudo\tALL=(ALL:ALL) ALL/%sudo ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers")
-
-
-# Amazon is hard loading their configs if they don't dectect everything,
-# this will ignore some future changes made to /etc/ssh/config files.
-# We move it to disabled, to revert simply rename the file without the .disabled
-def fix_eic():
-    eic_file = '/lib/systemd/system/ssh.service.d/ec2-instance-connect.conf'
-    if os.path.exists(eic_file):
-        os.system('systemctl stop ssh.service')
-        os.system('mv {} {}.disabled'.format(eic_file, eic_file))
-        os.system('systemctl daemon-reload')
-
-
-def check_sudo_passwd():
-    result = os.popen('passwd --status root').read().split(' ')
-    if result and result[1] != 'P':
-        sys.exit('Please set the password of the `root` user before enabling ldap sudoers. E.g sudo passwd root')
+        os.system("sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL/%wheel\tALL=(ALL)\tNOPASSWD:ALL/' /etc/sudoers")
 
 
 def restart():
-    # restart nslcd, nscd, ssh
-    os.system('systemctl restart nslcd.service')
-    os.system('systemctl restart nscd.service')
-    os.system('systemctl restart ssh.service')
+    os.system("service sssd restart")
+    os.system("service sshd restart")
 
 
 def file_contains(filename, pattern):
