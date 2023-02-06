@@ -26,6 +26,7 @@
 
 import argparse
 from datetime import datetime
+import difflib
 import os
 import re
 import sys
@@ -46,16 +47,40 @@ def main():
     parser.add_argument('--idle-timelimit', default=600, type=int, help='LDAP idle time out setting, default to 10m')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
-    parser.add_argument('--require-sudoers-pw',
-                        default=False,
-                        action='store_true',
-                        help='set sudoers default password requirement')
+    parser.add_argument('--require-sudoers-pw', default=False, action='store_true', help='set sudoers default password requirement')
+    parser.add_argument('--debug', default=False, action='store_true', help='Turn on debug mode')
+    # Foxpass SUDOers add-on
+    parser.add_argument('--enable-ldap-sudoers', default=False, action='store_true', help='Enable Foxpass SUDOers')
+    parser.add_argument('--sudoers-timed', default=False, action='store_true', help='Toggle sudoers_timed parameter')
+    parser.add_argument('--bind-timelimit', default=30, help='The amount of time, in seconds, to wait while trying to connect to an LDAP server.')
+    parser.add_argument('--query-timelimit', default=30, help='The amount of time, in seconds, to wait while performing an LDAP query.')
 
     args = parser.parse_args()
 
     binddn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
     uris = [args.ldap_uri] + args.ldaps
+
+    if args.debug:
+        foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
+        nslcd_path = '/etc/nslcd.conf'
+        sshd_config_path = '/etc/ssh/sshd_config'
+        cs_path = '/etc/pam.d/common-session'
+        csn_path = '/etc/pam.d/common-session-noninteractive'
+        nsswitch_path = '/etc/nsswitch.conf'
+        sudoers_path = '/etc/sudoers'
+        foxpass_sudo_path = '/etc/sudoers.d/95-foxpass-sudo'
+        sudo_ldap_path = '/etc/sudo-ldap.conf'
+
+        from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        from_file_nslcd = open_file(nslcd_path)
+        from_file_sshd_config = open_file(sshd_config_path)
+        from_file_cs = open_file(cs_path)
+        from_file_csn = open_file(csn_path)
+        from_file_nsswitch = open_file(nsswitch_path)
+        from_sudoers_file = open_file(sudoers_path)
+        from_foxpass_sudo_file = open_file(foxpass_sudo_path)
+        from_file_sudo_ldap = open_file(sudo_ldap_path)
 
     apt_get_update()
     install_dependencies()
@@ -66,12 +91,32 @@ def main():
     fix_nsswitch()
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
     fix_eic()
+
+    if args.enable_ldap_sudoers:
+        write_ldap_sudoers(uris, args.base_dn, binddn, args.bind_pw, args.sudoers_timed, args.bind_timelimit, args.query_timelimit)
+
+    if args.debug:
+        to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        to_file_nslcd = open_file(nslcd_path)
+        to_file_sshd_config = open_file(sshd_config_path)
+        to_file_cs = open_file(cs_path)
+        to_file_csn = open_file(csn_path)
+        to_file_nsswitch = open_file(nsswitch_path)
+        to_sudoers_file = open_file(sudoers_path)
+        to_foxpass_sudo_file = open_file(foxpass_sudo_path)
+        to_file_sudo_ldap = open_file(sudo_ldap_path)
+
+        diff_files(from_file_foxpass_ssh_keys, to_file_foxpass_ssh_keys, foxpass_ssh_keys_path)
+        diff_files(from_file_nslcd, to_file_nslcd, nslcd_path)
+        diff_files(from_file_sshd_config, to_file_sshd_config, sshd_config_path)
+        diff_files(from_file_cs, to_file_cs, cs_path)
+        diff_files(from_file_csn, to_file_csn, csn_path)
+        diff_files(from_file_nsswitch, to_file_nsswitch, nsswitch_path)
+        diff_files(from_sudoers_file, to_sudoers_file, sudoers_path)
+        diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, foxpass_sudo_path)
+        diff_files(from_file_sudo_ldap, to_file_sudo_ldap, sudo_ldap_path)
+
     restart()
-
-    # make sure the nslcd permission is set properly
-    os.system('chmod 755 /var/run/nslcd')
-
-
 
 
 def apt_get_update():
@@ -117,8 +162,46 @@ user="$1"
 secret="%s"
 hostname=`hostname`
 if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
-aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
-aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+
+aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
+if [ -z "$aws_token" ]
+then
+  aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+else
+  aws_instance_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+fi
+
+%s
+exit $?
+"""
+        elif is_gce_host():
+            append = '&provider=gce&gce_instance_id=${gce_instance_id}&gce_zone=${gce_zone}&gce_project_id=${gce_project_id}${gce_networks}${gce_network_tags}" 2>/dev/null'
+            curls = [curl + append for curl in curls]
+            contents = """\
+#!/bin/bash
+user="$1"
+secret="%s"
+hostname=`hostname`
+headers="Metadata-Flavor: Google"
+if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
+gce_instance_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/id`
+gce_zone=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/zone`
+gce_project_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/project/project-id`
+networks=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/`)
+gce_networks=''
+for gce_network in "${networks[@]}"
+do
+    gce_network=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
+    gce_networks=${gce_networks}&gce_networks[]=${gce_network}
+done
+network_tags=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text`)
+gce_network_tags=''
+for gce_network_tag in "${network_tags[@]}"
+do
+    gce_network_tags=${gce_network_tags}&gce_network_tags[]=${gce_network_tag}
+done
 %s
 exit $?
 """
@@ -217,6 +300,51 @@ def fix_nsswitch():
     os.system("sed -i 's/group:.*/group:          compat ldap/' /etc/nsswitch.conf")
     os.system("sed -i 's/shadow:.*/shadow:         compat ldap/' /etc/nsswitch.conf")
 
+def write_ldap_sudoers(uris, basedn, binddn, bindpw, sudoers_timed, bind_timelimit, query_timelimit):
+    check_sudo_passwd()
+    return_code = os.system('DEBIAN_FRONTEND=noninteractive apt-get install -y sudo-ldap')
+    if return_code != 0:
+        # bitshift right 8 to get rid of the signal portion of the return code
+        sys.exit(return_code >> 8)
+    with open('/etc/sudo-ldap.conf', "w") as w:
+        content = """\
+#
+# LDAP Defaults
+#
+
+# See ldap.conf(5) for details
+# This file should be world readable but not world writable.
+
+URI         {uri}
+BINDDN      {binddn}
+BINDPW      {bindpw}
+
+# The amount of time, in seconds, to wait while trying to connect to
+# an LDAP server.
+bind_timelimit {bind_timelimit}
+#
+# The amount of time, in seconds, to wait while performing an LDAP query.
+timelimit {query_timelimit}
+#
+# Must be set or sudo will ignore LDAP; may be specified multiple times.
+sudoers_base   ou=SUDOers,{basedn}
+#
+# verbose sudoers matching from ldap
+sudoers_debug 0
+#
+# Enable support for time-based entries in sudoers.
+sudoers_timed {sudoers_timed}
+
+#SIZELIMIT      12
+#TIMELIMIT      15
+#DEREF          never
+
+# TLS certificates (needed for GnuTLS)
+TLS_CACERT      /etc/ssl/certs/ca-certificates.crt
+"""
+        w.write(content.format(uri=uris[0], basedn=basedn, binddn=binddn, bindpw=bindpw,
+            sudoers_timed=str(sudoers_timed).lower(), bind_timelimit=bind_timelimit, query_timelimit=query_timelimit))
+
 
 # give "sudo" and chosen sudoers groups sudo permissions without password
 def fix_sudo(sudoers, require_sudoers_pw, update_sudoers):
@@ -244,6 +372,12 @@ def fix_eic():
         os.system('systemctl daemon-reload')
 
 
+def check_sudo_passwd():
+    result = os.popen('passwd --status root').read().split(' ')
+    if result and result[1] != 'P':
+        sys.exit('Please set the password of the `root` user before enabling ldap sudoers. E.g sudo passwd root')
+
+
 def restart():
     # restart nslcd, nscd, ssh
     os.system('systemctl restart nslcd.service')
@@ -259,14 +393,54 @@ def file_contains(filename, pattern):
     return False
 
 
+def is_gce_host():
+    http = urllib3.PoolManager(timeout=.1)
+    url = 'http://metadata.google.internal/computeMetadata/v1/instance/'
+    try:
+        r = http.request('GET', url, headers={"Metadata-Flavor": "Google"})
+        if r.status != 200:
+            raise Exception
+        return True
+    except Exception:
+            return False
+
+
 def is_ec2_host():
+    http = urllib3.PoolManager(timeout=.1)
+    url = 'http://169.254.169.254/latest/api/token'
+    try:
+        r = http.request('PUT', url)
+        if r.status != 200:
+            raise Exception
+        return True
+    except Exception:
+        return is_ec2_host_imds_v1_fallback()
+
+
+def is_ec2_host_imds_v1_fallback():
     http = urllib3.PoolManager(timeout=.1)
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = http.request('GET', url)
+        if r.status != 200:
+            raise Exception
         return True
     except Exception:
         return False
+
+
+def open_file(path):
+    if os.path.exists(path):
+        with open(path, 'r') as file:
+            return file.readlines()
+    else:
+        return []
+
+
+def diff_files(from_file, to_file, filename):
+    diff = difflib.unified_diff(from_file, to_file, fromfile='Old {}'.format(filename), tofile='New {}'.format(filename))
+    for line in diff:
+        sys.stdout.write(line)
 
 
 if __name__ == '__main__':
