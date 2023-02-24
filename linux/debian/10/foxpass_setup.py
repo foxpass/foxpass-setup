@@ -340,7 +340,7 @@ def is_ec2_host():
     http = urllib3.PoolManager(timeout=.1)
     url = 'http://169.254.169.254/latest/api/token'
     try:
-        r = http.request('PUT', url)
+        r = http.request('PUT', url, headers={"X-aws-ec2-metadata-token-ttl-seconds": 30})
         if r.status != 200:
             raise Exception
         return True
