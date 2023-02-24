@@ -194,13 +194,13 @@ gce_networks=''
 for gce_network in "${networks[@]}"
 do
     gce_network=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
-    gce_networks=${gce_networks}&gce_networks[]=${gce_network}
+    gce_networks="${gce_networks}&gce_networks[]=${gce_network}"
 done
 network_tags=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text`)
 gce_network_tags=''
 for gce_network_tag in "${network_tags[@]}"
 do
-    gce_network_tags=${gce_network_tags}&gce_network_tags[]=${gce_network_tag}
+    gce_network_tags="${gce_network_tags}&gce_network_tags[]=${gce_network_tag}"
 done
 %s
 exit $?
@@ -422,9 +422,11 @@ def is_ec2_host_imds_v1_fallback():
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = http.request('GET', url)
-        if r.status != 200:
+        pattern="^i-[a-f0-9]{8}(?:[a-f0-9]{9})?$"
+        if re.match(pattern, r.data.decode('utf-8')):
+            return True
+        else:
             raise Exception
-        return True
     except Exception:
         return False
 
