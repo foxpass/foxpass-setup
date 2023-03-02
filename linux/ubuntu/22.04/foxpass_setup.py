@@ -117,7 +117,7 @@ user="$1"
 secret="%s"
 pwfile="/etc/passwd"
 hostname=`hostname`
-if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, quitting.." > /dev/stderr; exit; fi
+if grep -q "^${user/./\\\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
 aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 %s
@@ -132,7 +132,7 @@ exit $?
 user="$1"
 secret="%s"
 hostname=`hostname`
-if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 %s
 exit $?
 """
