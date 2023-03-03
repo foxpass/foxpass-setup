@@ -132,7 +132,7 @@ pwfile="/etc/passwd"
 hostname=`hostname`
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 %s
-exit $? """
+exit $?"""
         w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
