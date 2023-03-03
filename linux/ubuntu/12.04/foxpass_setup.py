@@ -240,6 +240,15 @@ def file_contains(filename, pattern):
 
 
 def is_ec2_host():
+    url = 'http://169.254.169.254/latest/api/token'
+    try:
+        r = urllib2.request('PUT', url, headers={"X-aws-ec2-metadata-token-ttl-seconds": 30})
+        return True
+    except Exception:
+        return is_ec2_host_imds_v1_fallback()
+
+
+def is_ec2_host_imds_v1_fallback():
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = urllib2.urlopen(url, timeout=.1)
