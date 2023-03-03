@@ -160,9 +160,9 @@ def write_foxpass_ssh_keys_script(apis, api_key):
 user="$1"
 secret="%s"
 pwfile="/etc/passwd"
-hostname=`hostname`
-common_curl_args="--disable --silent --fail"
+hostname=$(hostname)
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
+common_curl_args="--disable --silent --fail"
 aws_token=$(curl $common_curl_args --max-time 10 --request PUT --header "X-aws-ec2-metadata-token-ttl-seconds: 30" "http://169.254.169.254/latest/api/token")
 if [ -z "$aws_token" ]
 then
@@ -182,7 +182,7 @@ exit $?"""
 user="$1"
 secret="%s"
 pwfile="/etc/passwd"
-hostname=`hostname`
+hostname=$(hostname)
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 %s
 exit $?"""
