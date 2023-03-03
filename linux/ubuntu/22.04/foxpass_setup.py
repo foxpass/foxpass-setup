@@ -146,7 +146,7 @@ def install_dependencies():
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
-    base_curl = 'curl --silent --disable --fail --max-time 5 --header "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    base_curl = 'curl --disable --silent --fail --max-time 5 --header "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
     curls = []
     for api in apis:
         curls.append(base_curl % api)
@@ -162,7 +162,7 @@ user="$1"
 secret="%s"
 hostname=`hostname`
 if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
-common_curl_args="--silent --disable --fail"
+common_curl_args="--disable --silent --fail"
 aws_token=$(curl $common_curl_args --max-time 10 --request PUT --header "X-aws-ec2-metadata-token-ttl-seconds: 30" "http://169.254.169.254/latest/api/token")
 if [ -z "$aws_token" ]
 then
