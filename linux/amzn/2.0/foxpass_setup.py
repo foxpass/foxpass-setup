@@ -48,6 +48,7 @@ def main():
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
     parser.add_argument('--keep-command', default=False, action='store_true', help='Do not replace sshd key command')
     parser.add_argument('--require-sudoers-pw', default=False, action='store_true', help='set sudoers default password requirement')
+    parser.add_argument('--allow-authorized-keys-file-for', default='*', type=str, help='allow authorized keys file for given user; by default all users are allowed. specify multiple users with comma.')
     parser.add_argument('--opt-timeout', default=6, help='option to set the sssd opt timeout')
     parser.add_argument('--debug', default=False, action='store_true', help='Turn on debug mode')
     # Foxpass SUDOers add-on
@@ -82,7 +83,7 @@ def main():
     write_foxpass_ssh_keys_script(apis, args.api_key)
     run_authconfig(args.ldap_uri, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw, args.ldaps, args.opt_timeout)
-    augment_sshd_config(args.keep_command)
+    augment_sshd_config(args.keep_command, args.allow_authorized_keys_file_for)
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
 
     if args.enable_ldap_sudoers:
@@ -166,7 +167,7 @@ exit $?"""
 
 def run_authconfig(uri, base_dn):
     cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=uri, base_dn=base_dn)
-    print 'Running %s' % cmd
+    print('Running {}'.format(cmd))
     os.system(cmd)
 
 
@@ -220,8 +221,25 @@ def configure_ldap_sudoers(base_dn, sudo_timed, full_refresh_interval, smart_ref
     augment_nsswitch()
 
 
-def augment_sshd_config(keep_command):
+def augment_sshd_config(keep_command, allow_authorized_keys_file_for):
     sshd_config_file = '/etc/ssh/sshd_config'
+
+    if not file_contains(sshd_config_file, r'^AuthorizedKeysFile'):
+        with open('/etc/ssh/sshd_config', "a") as w:
+            w.write("\n")
+            w.write("AuthorizedKeysFile\tNone\n")
+    else:
+        os.system("sed -i 's/^AuthorizedKeysFile.*/AuthorizedKeysFile\tNone/' {}".format(sshd_config_file))
+
+    if not file_contains(sshd_config_file, r'^Match User'):
+        with open(sshd_config_file, "a") as w:
+            w.write("\n")
+            w.write("Match User {}\n".format(allow_authorized_keys_file_for))
+            w.write("\tAuthorizedKeysFile .ssh/authorized_keys\n")
+
+    # dynamically update the Match User value
+    os.system("sed -i 's/^Match User.*/Match User {}/' {}".format(allow_authorized_keys_file_for, sshd_config_file))
+
     key_command = 'AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n'
     key_command_user = 'AuthorizedKeysCommandUser\troot\n'
     if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\w'):
@@ -231,8 +249,7 @@ def augment_sshd_config(keep_command):
             clean_authorizedkeyscommand(sshd_config_file)
             write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
     else:
-        print 'AuthorizedKeysCommand already set, will not use Foxpass for ssh key verification'
-        return
+        print('AuthorizedKeysCommand already set, will not use Foxpass for ssh key verification')
 
 
 def augment_openldap(bind_dn):
