@@ -160,16 +160,17 @@ def write_foxpass_ssh_keys_script(apis, api_key):
 user="$1"
 secret="%s"
 pwfile="/etc/passwd"
-hostname=`hostname`
+hostname=$(hostname)
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
-aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
+common_curl_args="--disable --silent --fail"
+aws_token=$(curl $common_curl_args --max-time 10 --request PUT --header "X-aws-ec2-metadata-token-ttl-seconds: 30" "http://169.254.169.254/latest/api/token")
 if [ -z "$aws_token" ]
 then
-  aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
-  aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+  aws_instance_id=$(curl $common_curl_args "http://169.254.169.254/latest/meta-data/instance-id")
+  aws_region_id=$(curl $common_curl_args "http://169.254.169.254/latest/meta-data/placement/region")
 else
-  aws_instance_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/instance-id`
-  aws_region_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+  aws_instance_id=$(curl $common_curl_args --header "X-aws-ec2-metadata-token: ${aws_token}" "http://169.254.169.254/latest/meta-data/instance-id")
+  aws_region_id=$(curl $common_curl_args --header "X-aws-ec2-metadata-token: ${aws_token}" "http://169.254.169.254/latest/meta-data/placement/region")
 fi
 %s
 exit $?"""
@@ -181,7 +182,7 @@ exit $?"""
 user="$1"
 secret="%s"
 pwfile="/etc/passwd"
-hostname=`hostname`
+hostname=$(hostname)
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 %s
 exit $?"""
