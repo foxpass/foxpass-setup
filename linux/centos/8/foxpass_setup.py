@@ -215,6 +215,7 @@ def configure_ldap_sudoers(base_dn, sudo_timed, full_refresh_interval, smart_ref
     domain.set_option('ldap_sudo_search_base', 'ou=SUDOers,{}'.format(base_dn))
     domain.set_option('ldap_sudo_full_refresh_interval', full_refresh_interval)
     domain.set_option('ldap_sudo_smart_refresh_interval', smart_refresh_interval)
+    domain.set_option('ldap_sudo_include_regexp', 'True')
 
     sssdconfig.activate_service('sudo')
     sssdconfig.set('sudo', 'sudo_timed', str(sudo_timed).lower())
