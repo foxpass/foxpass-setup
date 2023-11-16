@@ -116,7 +116,7 @@ def main():
 
 def install_dependencies():
     # install dependencies
-    os.system('yum install -y sssd authconfig python3-sssdconfig')
+    os.system('yum install -y sssd authconfig python3-sssdconfig libsss_sudo')
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
