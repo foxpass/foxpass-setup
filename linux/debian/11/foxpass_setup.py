@@ -134,15 +134,13 @@ def write_foxpass_ssh_keys_script(apis, api_key):
     with open('/usr/sbin/foxpass_ssh_keys.sh', "w") as w:
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
-            curls = [curl + append for curl in curls]
-            contents = """\
-#!/bin/bash
+            contents = r"""#!/bin/bash
 
 user="$1"
 secret="%s"
+pwfile="/etc/passwd"
 hostname=`hostname`
-if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
-
+if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
 if [ -z "$aws_token" ]
 then
@@ -188,13 +186,13 @@ exit $?
         else:
             append = '" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = """\
-#!/bin/bash
+            contents = r"""#!/bin/bash
 
 user="$1"
 secret="%s"
+pwfile="/etc/passwd"
 hostname=`hostname`
-if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
+if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 %s
 exit $?
 """
@@ -340,7 +338,7 @@ def is_ec2_host():
     http = urllib3.PoolManager(timeout=.1)
     url = 'http://169.254.169.254/latest/api/token'
     try:
-        r = http.request('PUT', url)
+        r = http.request('PUT', url, headers={"X-aws-ec2-metadata-token-ttl-seconds": 30})
         if r.status != 200:
             raise Exception
         return True

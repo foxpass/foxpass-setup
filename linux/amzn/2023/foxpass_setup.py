@@ -1,4 +1,4 @@
-#!/usr/bin/python27
+#!/usr/bin/python3
 
 # Copyright (c) 2016-present, Foxpass, Inc.
 # All rights reserved.
@@ -26,6 +26,7 @@
 
 import argparse
 from datetime import datetime
+import difflib
 import os
 import re
 import sys
@@ -44,37 +45,78 @@ def main():
     parser.add_argument('--api-url', '--api', default='https://api.foxpass.com', help='API Url')
     parser.add_argument('--secondary-api', dest='apis', default=[], action='append', help='Secondary API Server(s)')
     parser.add_argument('--sudoers-group', default='foxpass-sudo', type=str, help='sudoers group with root access')
+    parser.add_argument('--keep-command', default=False, action='store_true', help='Do not replace sshd key command')
     parser.add_argument('--update-sudoers', default=False, action='store_true', help='update 95-foxpass-sudo with new group')
-    parser.add_argument('--require-sudoers-pw',
-                        default=False,
-                        action='store_true',
-                        help='set sudoers default password requirement')
+    parser.add_argument('--require-sudoers-pw', default=False, action='store_true', help='set sudoers default password requirement')
     parser.add_argument('--opt-timeout', default=6, help='option to set the sssd opt timeout')
+    parser.add_argument('--debug', default=False, action='store_true', help='Turn on debug mode')
+    # Foxpass SUDOers add-on
+    parser.add_argument('--enable-ldap-sudoers', default=False, action='store_true', help='Enable Foxpass SUDOers')
+    parser.add_argument('--sudo-timed', default=False, action='store_true', help='Toggle sudo_timed parameter')
+    parser.add_argument('--full-refresh-interval', default=21600, help='Default is 6 hours in seconds')
+    parser.add_argument('--smart-refresh-interval', default=900, help='Default is 15 minutes in seconds')
 
     args = parser.parse_args()
 
     bind_dn = 'cn=%s,%s' % (args.bind_user, args.base_dn)
     apis = [args.api_url] + args.apis
 
+    if args.debug:
+        foxpass_ssh_keys_path = '/usr/local/sbin/foxpass_ssh_keys.sh'
+        sssd_path = '/etc/sssd/conf.d/authconfig-sssd.conf'
+        sshd_config_path = '/etc/ssh/sshd_config'
+        ldap_path = '/etc/openldap/ldap.conf'
+        nsswitch_path = '/etc/nsswitch.conf'
+        sudoers_path = '/etc/sudoers'
+        foxpass_sudo_path = '/etc/sudoers.d/95-foxpass-sudo'
+
+        from_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        from_file_sssd = open_file(sssd_path)
+        from_file_sshd_config = open_file(sshd_config_path)
+        from_file_ldap = open_file(ldap_path)
+        from_file_nsswitch = open_file(nsswitch_path)
+        from_sudoers_file = open_file(sudoers_path)
+        from_foxpass_sudo_file = open_file(foxpass_sudo_path)
+
     install_dependencies()
     write_foxpass_ssh_keys_script(apis, args.api_key)
     run_authconfig(args.ldap_uri, args.base_dn)
     configure_sssd(bind_dn, args.bind_pw, args.ldaps, args.opt_timeout)
-    augment_sshd_config()
+    augment_sshd_config(args.keep_command)
     fix_sudo(args.sudoers_group, args.require_sudoers_pw, args.update_sudoers)
+
+    if args.enable_ldap_sudoers:
+        configure_ldap_sudoers(args.base_dn, args.sudo_timed, args.full_refresh_interval, args.smart_refresh_interval)
+
+    if args.debug:
+        to_file_foxpass_ssh_keys = open_file(foxpass_ssh_keys_path)
+        to_file_sssd = open_file(sssd_path)
+        to_file_sshd_config = open_file(sshd_config_path)
+        to_file_ldap = open_file(ldap_path)
+        to_file_nsswitch = open_file(nsswitch_path)
+        to_sudoers_file = open_file(sudoers_path)
+        to_foxpass_sudo_file = open_file(foxpass_sudo_path)
+
+        diff_files(from_file_foxpass_ssh_keys, to_file_foxpass_ssh_keys, foxpass_ssh_keys_path)
+        diff_files(from_file_sssd, to_file_sssd, sssd_path)
+        diff_files(from_file_sshd_config, to_file_sshd_config, sshd_config_path)
+        diff_files(from_file_ldap, to_file_ldap, ldap_path)
+        diff_files(from_file_nsswitch, to_file_nsswitch, nsswitch_path)
+        diff_files(from_sudoers_file, to_sudoers_file, sudoers_path)
+        diff_files(from_foxpass_sudo_file, to_foxpass_sudo_file, foxpass_sudo_path)
 
     # sleep to the next second to make sure sssd.conf has a new timestamp
     time.sleep(1)
     # touch the sssd conf file again
-    os.system('touch /etc/sssd/sssd.conf')
+    os.system('touch /etc/sssd/conf.d/authconfig-sssd.conf')
+    os.system('chmod 600 /etc/sssd/conf.d/authconfig-sssd.conf')
 
     restart()
 
 
 def install_dependencies():
     # install dependencies
-    os.system('yum update -y krb5-libs')
-    os.system('yum install -y sssd authconfig')
+    os.system('yum install -y sssd authconfig python3-sssdconfig libsss_sudo')
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
@@ -92,17 +134,16 @@ def write_foxpass_ssh_keys_script(apis, api_key):
 user="$1"
 secret="%s"
 pwfile="/etc/passwd"
-hostname=$(hostname)
+hostname=`hostname`
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
-common_curl_args="--disable --silent --fail"
-aws_token=$(curl $common_curl_args --max-time 10 --request PUT --header "X-aws-ec2-metadata-token-ttl-seconds: 30" "http://169.254.169.254/latest/api/token")
+aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
 if [ -z "$aws_token" ]
 then
-  aws_instance_id=$(curl $common_curl_args "http://169.254.169.254/latest/meta-data/instance-id")
-  aws_region_id=$(curl $common_curl_args "http://169.254.169.254/latest/meta-data/placement/region")
+  aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 else
-  aws_instance_id=$(curl $common_curl_args --header "X-aws-ec2-metadata-token: ${aws_token}" "http://169.254.169.254/latest/meta-data/instance-id")
-  aws_region_id=$(curl $common_curl_args --header "X-aws-ec2-metadata-token: ${aws_token}" "http://169.254.169.254/latest/meta-data/placement/region")
+  aws_instance_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 fi
 %s
 exit $?"""
@@ -114,7 +155,7 @@ exit $?"""
 user="$1"
 secret="%s"
 pwfile="/etc/passwd"
-hostname=$(hostname)
+hostname=`hostname`
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 %s
 exit $?"""
@@ -126,7 +167,7 @@ exit $?"""
 
 def run_authconfig(uri, base_dn):
     cmd = 'authconfig --enablesssd --enablesssdauth --enablelocauthorize --enableldap --enableldapauth --ldapserver={uri} --disableldaptls --ldapbasedn={base_dn} --enablemkhomedir --enablecachecreds --update'.format(uri=uri, base_dn=base_dn)
-    print 'Running %s' % cmd
+    print('Running {}'.format(cmd))
     os.system(cmd)
 
 
@@ -134,8 +175,12 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps, opt_timeout):
     from SSSDConfig import SSSDConfig
 
     sssdconfig = SSSDConfig()
-    sssdconfig.import_config('/etc/sssd/sssd.conf')
+    sssdconfig.import_config('/etc/sssd/conf.d/authconfig-sssd.conf')
 
+    sssdconfig.new_service('pam')
+    sssdconfig.new_service('nss')
+    sssdconfig.activate_service('pam')
+    sssdconfig.activate_service('nss')
     domain = sssdconfig.get_domain('default')
     domain.add_provider('ldap', 'id')
     if backup_ldaps:
@@ -154,12 +199,76 @@ def configure_sssd(bind_dn, bind_pw, backup_ldaps, opt_timeout):
     sssdconfig.write()
 
 
-def augment_sshd_config():
-    if not file_contains('/etc/ssh/sshd_config', r'^AuthorizedKeysCommand\w'):
-        with open('/etc/ssh/sshd_config', "a") as w:
-            w.write("\n")
-            w.write("AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n")
-            w.write("AuthorizedKeysCommandUser\troot\n")
+def configure_ldap_sudoers(base_dn, sudo_timed, full_refresh_interval, smart_refresh_interval):
+    from SSSDConfig import SSSDConfig
+    sssdconfig = SSSDConfig()
+    sssdconfig.import_config('/etc/sssd/conf.d/authconfig-sssd.conf')
+
+    try:
+        sssdconfig.new_service('sudo')
+        sssdconfig.activate_service('sudo')
+    except:
+        pass
+
+    domain = sssdconfig.get_domain('default')
+    domain.add_provider('ldap', 'sudo')
+    domain.set_option('ldap_sudo_search_base', 'ou=SUDOers,{}'.format(base_dn))
+    domain.set_option('ldap_sudo_full_refresh_interval', full_refresh_interval)
+    domain.set_option('ldap_sudo_smart_refresh_interval', smart_refresh_interval)
+
+    sssdconfig.activate_service('sudo')
+    sssdconfig.set('sudo', 'sudo_timed', str(sudo_timed).lower())
+    sssdconfig.save_domain(domain)
+    sssdconfig.write()
+
+    augment_openldap(base_dn)
+    augment_nsswitch()
+
+
+def augment_sshd_config(keep_command):
+    sshd_config_file = '/etc/ssh/sshd_config'
+    key_command = 'AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys.sh\n'
+    key_command_user = 'AuthorizedKeysCommandUser\troot\n'
+    if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\w'):
+        write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
+    elif not keep_command:
+        if not file_contains(sshd_config_file, r'^AuthorizedKeysCommand\t\t/usr/local/sbin/foxpass_ssh_keys\.sh$'):
+            clean_authorizedkeyscommand(sshd_config_file)
+            write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user)
+    else:
+        print('AuthorizedKeysCommand already set, will not use Foxpass for ssh key verification')
+        return
+
+
+def augment_openldap(bind_dn):
+    if not file_contains('/etc/openldap/ldap.conf', r'^SUDOERS_BASE'):
+        with open('/etc/openldap/ldap.conf', "a") as w:
+            w.write("\nSUDOERS_BASE ou=SUDOers,{}".format(bind_dn))
+
+
+def augment_nsswitch():
+    if not file_contains('/etc/nsswitch.conf', r'^sudoers:'):
+        with open('/etc/nsswitch.conf', "a") as w:
+            w.write("sudoers: files sss")
+
+
+def write_authorizedkeyscommand(sshd_config_file, key_command, key_command_user):
+    with open(sshd_config_file, 'a') as w:
+        w.write('\n')
+        w.write(key_command)
+        w.write(key_command_user)
+
+
+def clean_authorizedkeyscommand(sshd_config_file):
+    with open(sshd_config_file, 'r+') as f:
+        lines = f.readlines()
+        f.seek(0)
+        for line in lines:
+            if re.match(r'^AuthorizedKeysCommand', line):
+                f.write('# ' + line)
+            else:
+                f.write(line)
+        f.truncate()
 
 
 # give "wheel" and chosen sudoers groups sudo permissions without password
@@ -205,13 +314,23 @@ def is_ec2_host_imds_v1_fallback():
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = http.request('GET', url)
-        pattern="^i-[a-f0-9]{8}(?:[a-f0-9]{9})?$"
-        if re.match(pattern, r.data.decode('utf-8')):
-            return True
-        else:
-            raise Exception
+        return True
     except Exception:
         return False
+
+
+def open_file(path):
+    if os.path.exists(path):
+        with open(path, 'r') as file:
+            return file.readlines()
+    else:
+        return []
+
+
+def diff_files(from_file, to_file, filename):
+    diff = difflib.unified_diff(from_file, to_file, fromfile='Old {}'.format(filename), tofile='New {}'.format(filename))
+    for line in diff:
+        sys.stdout.write(line)
 
 
 if __name__ == '__main__':
