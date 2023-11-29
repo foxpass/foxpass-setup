@@ -128,8 +128,7 @@ def write_foxpass_ssh_keys_script(apis, api_key):
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = r"""\
-#!/bin/bash
+            contents = r"""#!/bin/bash
 
 user="$1"
 secret="%s"
@@ -152,12 +151,12 @@ exit $?
         elif is_gce_host():
             append = '&provider=gce&gce_instance_id=${gce_instance_id}&gce_zone=${gce_zone}&gce_project_id=${gce_project_id}${gce_networks}${gce_network_tags}" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = r"""\
-#!/bin/bash
+            contents = r"""#!/bin/bash
 
 user="$1"
 secret="%s"
-hostname=`hostname`
+pwfile="/etc/passwd"
+hostname=$(hostname)
 headers="Metadata-Flavor: Google"
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 common_curl_args="--disable --silent --fail"
@@ -183,8 +182,7 @@ exit $?
         else:
             append = '" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = r"""\
-#!/bin/bash
+            contents = r"""#!/bin/bash
 
 user="$1"
 secret="%s"
