@@ -155,21 +155,22 @@ def write_foxpass_ssh_keys_script(apis, api_key):
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = r"""#!/bin/bash
+            contents = r"""\
+#!/bin/bash
 
 user="$1"
 secret="%s"
-hostname=`hostname`
-if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
-
-aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
+hostname=$(hostname)
+if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
+common_curl_args="--disable --silent --fail"
+aws_token=`curl -m 10 $common_curl_args -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
 if [ -z "$aws_token" ]
 then
-  aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
-  aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+  aws_instance_id=`curl $common_curl_args http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl $common_curl_args http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 else
-  aws_instance_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/instance-id`
-  aws_region_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+  aws_instance_id=`curl $common_curl_args -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl $common_curl_args -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 fi
 
 %s
@@ -178,50 +179,39 @@ exit $?
         elif is_gce_host():
             append = '&provider=gce&gce_instance_id=${gce_instance_id}&gce_zone=${gce_zone}&gce_project_id=${gce_project_id}${gce_networks}${gce_network_tags}" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = """\
+            contents = r"""\
 #!/bin/bash
+
 user="$1"
 secret="%s"
-hostname=`hostname`
+hostname=$(hostname)
 headers="Metadata-Flavor: Google"
-if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
-gce_instance_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/id`
-gce_zone=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/zone`
-gce_project_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/project/project-id`
-networks=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/`)
+if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
+common_curl_args="--disable --silent --fail"
+gce_instance_id=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/id`
+gce_zone=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/zone`
+gce_project_id=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/project/project-id`
+networks=(`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/`)
 gce_networks=''
 for gce_network in "${networks[@]}"
 do
-    gce_network=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
+    gce_network=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
     gce_networks="${gce_networks}&gce_networks[]=${gce_network}"
 done
-network_tags=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text`)
+network_tags=(`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text`)
 gce_network_tags=''
 for gce_network_tag in "${network_tags[@]}"
 do
     gce_network_tags="${gce_network_tags}&gce_network_tags[]=${gce_network_tag}"
 done
-=======
-pwfile="/etc/passwd"
-hostname=$(hostname)
-if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
-common_curl_args="--disable --silent --fail"
-aws_token=$(curl $common_curl_args --max-time 10 --request PUT --header "X-aws-ec2-metadata-token-ttl-seconds: 30" "http://169.254.169.254/latest/api/token")
-if [ -z "$aws_token" ]
-then
-  aws_instance_id=$(curl $common_curl_args "http://169.254.169.254/latest/meta-data/instance-id")
-  aws_region_id=$(curl $common_curl_args "http://169.254.169.254/latest/meta-data/placement/region")
-else
-  aws_instance_id=$(curl $common_curl_args --header "X-aws-ec2-metadata-token: ${aws_token}" "http://169.254.169.254/latest/meta-data/instance-id")
-  aws_region_id=$(curl $common_curl_args --header "X-aws-ec2-metadata-token: ${aws_token}" "http://169.254.169.254/latest/meta-data/placement/region")
-fi
-
 %s
-exit $?"""
+exit $?
+"""
         else:
             append = '" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = r"""#!/bin/bash
+            contents = r"""\
+#!/bin/bash
 
 user="$1"
 secret="%s"
@@ -229,7 +219,8 @@ pwfile="/etc/passwd"
 hostname=$(hostname)
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 %s
-exit $?"""
+exit $?
+"""
         w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside

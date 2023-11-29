@@ -178,24 +178,25 @@ exit $?
         elif is_gce_host():
             append = '&provider=gce&gce_instance_id=${gce_instance_id}&gce_zone=${gce_zone}&gce_project_id=${gce_project_id}${gce_networks}${gce_network_tags}" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = """\
+            contents = r"""\
 #!/bin/bash
 user="$1"
 secret="%s"
-hostname=`hostname`
+hostname=$(hostname)
 headers="Metadata-Flavor: Google"
-if grep -q "^${user/./\\\\.}:" /etc/passwd; then exit; fi
-gce_instance_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/id`
-gce_zone=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/zone`
-gce_project_id=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/project/project-id`
-networks=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/`)
+if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
+common_curl_args="--disable --silent --fail"
+gce_instance_id=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/id`
+gce_zone=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/zone`
+gce_project_id=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/project/project-id`
+networks=(`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/`)
 gce_networks=''
 for gce_network in "${networks[@]}"
 do
-    gce_network=`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
+    gce_network=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
     gce_networks="${gce_networks}&gce_networks[]=${gce_network}"
 done
-network_tags=(`curl -s -q -f -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text`)
+network_tags=(`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text`)
 gce_network_tags=''
 for gce_network_tag in "${network_tags[@]}"
 do
