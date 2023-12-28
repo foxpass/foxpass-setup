@@ -77,7 +77,7 @@ def install_dependencies():
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
-    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    base_curl = 'curl -q --disable --silent --fail --max-time 5 --header "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
     curls = []
     for api in apis:
         curls.append(base_curl % api)

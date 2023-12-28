@@ -120,7 +120,7 @@ def install_dependencies():
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
-    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    base_curl = 'curl -q --disable --silent --fail --max-time 5 --header "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
     curls = []
     for api in apis:
         curls.append(base_curl % api)
@@ -129,8 +129,7 @@ def write_foxpass_ssh_keys_script(apis, api_key):
         if is_ec2_host():
             append = '&aws_instance_id=${aws_instance_id}&aws_region_id=${aws_region_id}" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = r"""\
-#!/bin/bash
+            contents = r"""#!/bin/bash
 
 user="$1"
 secret="%s"
@@ -153,8 +152,7 @@ exit $?
         else:
             append = '" 2>/dev/null'
             curls = [curl + append for curl in curls]
-            contents = r"""\
-#!/bin/bash
+            contents = r"""#!/bin/bash
 
 user="$1"
 secret="%s"
