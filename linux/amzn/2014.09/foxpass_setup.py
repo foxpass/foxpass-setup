@@ -205,7 +205,13 @@ def is_ec2_host_imds_v1_fallback():
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = http.request('GET', url)
-        return True
+        pattern="^i-[a-f0-9]{8}(?:[a-f0-9]{9})?$"
+        # Check the response if it is returning the right instance id.
+        # The medatada endpoint works on VMWare vm but it's not the value we are expecting.
+        if re.match(pattern, r.data.decode('utf-8')):
+            return True
+        else:
+            raise Exception
     except Exception:
         return False
 

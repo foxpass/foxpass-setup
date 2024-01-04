@@ -120,7 +120,7 @@ def install_dependencies():
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
-    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    base_curl = 'curl -q --disable --silent --fail --max-time 5 --header "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
     curls = []
     for api in apis:
         curls.append(base_curl % api)
@@ -134,19 +134,21 @@ def write_foxpass_ssh_keys_script(apis, api_key):
 user="$1"
 secret="%s"
 pwfile="/etc/passwd"
-hostname=`hostname`
+hostname=$(hostname)
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
-aws_token=`curl -m 10 -s -q -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
+common_curl_args="--disable --silent --fail"
+aws_token=`curl -m 10 $common_curl_args -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 30"`
 if [ -z "$aws_token" ]
 then
-  aws_instance_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/instance-id`
-  aws_region_id=`curl -s -q -f http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+  aws_instance_id=`curl $common_curl_args http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl $common_curl_args http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 else
-  aws_instance_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/instance-id`
-  aws_region_id=`curl -s -q -f -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
+  aws_instance_id=`curl $common_curl_args -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/instance-id`
+  aws_region_id=`curl $common_curl_args -H "X-aws-ec2-metadata-token: ${aws_token}" http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/.$//'`
 fi
 %s
-exit $?"""
+exit $?
+"""
         else:
             append = '" 2>/dev/null'
             curls = [curl + append for curl in curls]
@@ -155,10 +157,11 @@ exit $?"""
 user="$1"
 secret="%s"
 pwfile="/etc/passwd"
-hostname=`hostname`
+hostname=$(hostname)
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 %s
-exit $?"""
+exit $?
+"""
         w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
@@ -314,7 +317,13 @@ def is_ec2_host_imds_v1_fallback():
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = http.request('GET', url)
-        return True
+        pattern="^i-[a-f0-9]{8}(?:[a-f0-9]{9})?$"
+        # Check the response if it is returning the right instance id.
+        # The medatada endpoint works on VMWare vm but it's not the value we are expecting.
+        if re.match(pattern, r.data.decode('utf-8')):
+            return True
+        else:
+            raise Exception
     except Exception:
         return False
 

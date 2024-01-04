@@ -77,7 +77,7 @@ def install_dependencies():
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
-    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    base_curl = 'curl -q --disable --silent --fail --max-time 5 --header "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
     curls = []
     for api in apis:
         curls.append(base_curl % api)
@@ -204,7 +204,13 @@ def is_ec2_host_imds_v1_fallback():
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = http.request('GET', url)
-        return True
+        pattern="^i-[a-f0-9]{8}(?:[a-f0-9]{9})?$"
+        # Check the response if it is returning the right instance id.
+        # The medatada endpoint works on VMWare vm but it's not the value we are expecting.
+        if re.match(pattern, r.data.decode('utf-8')):
+            return True
+        else:
+            raise Exception
     except Exception:
         return False
 

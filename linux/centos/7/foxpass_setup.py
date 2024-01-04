@@ -118,7 +118,7 @@ def install_dependencies():
 
 
 def write_foxpass_ssh_keys_script(apis, api_key):
-    base_curl = 'curl -s -q -m 5 -f -H "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
+    base_curl = 'curl -q --globoff --disable --silent --fail --max-time 5 --header "Authorization: Token ${secret}" "%s/sshkeys/?user=${user}&hostname=${hostname}'
     curls = []
     for api in apis:
         curls.append(base_curl % api)
@@ -145,7 +145,39 @@ else
   aws_region_id=$(curl $common_curl_args --header "X-aws-ec2-metadata-token: ${aws_token}" "http://169.254.169.254/latest/meta-data/placement/region")
 fi
 %s
-exit $?"""
+exit $?
+"""
+        elif is_gce_host():
+            append = '&provider=gce&gce_instance_id=${gce_instance_id}&gce_zone=${gce_zone}&gce_project_id=${gce_project_id}${gce_networks}${gce_network_tags}" 2>/dev/null'
+            curls = [curl + append for curl in curls]
+            contents = r"""#!/bin/bash
+
+user="$1"
+secret="%s"
+pwfile="/etc/passwd"
+hostname=$(hostname)
+headers="Metadata-Flavor: Google"
+if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
+common_curl_args="--disable --silent --fail"
+gce_instance_id=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/id`
+gce_zone=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/zone`
+gce_project_id=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/project/project-id`
+networks=(`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/`)
+gce_networks=''
+for gce_network in "${networks[@]}"
+do
+    gce_network=`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/${gce_network}network`
+    gce_networks="${gce_networks}&gce_networks[]=${gce_network}"
+done
+network_tags=(`curl $common_curl_args -H "${headers}" http://metadata.google.internal/computeMetadata/v1/instance/tags?alt=text`)
+gce_network_tags=''
+for gce_network_tag in "${network_tags[@]}"
+do
+    gce_network_tags="${gce_network_tags}&gce_network_tags[]=${gce_network_tag}"
+done
+%s
+exit $?
+"""
         else:
             append = '" 2>/dev/null'
             curls = [curl + append for curl in curls]
@@ -157,7 +189,8 @@ pwfile="/etc/passwd"
 hostname=$(hostname)
 if grep -q "^${user/./\\.}:" $pwfile; then echo "User $user found in file $pwfile, exiting." > /dev/stderr; exit; fi
 %s
-exit $?"""
+exit $?
+"""
         w.write(contents % (api_key, ' || '.join(curls)))
 
         # give permissions only to root to protect the API key inside
@@ -268,11 +301,25 @@ def file_contains(filename, pattern):
     return False
 
 
+def is_gce_host():
+    http = urllib3.PoolManager(timeout=.1)
+    url = 'http://metadata.google.internal/computeMetadata/v1/instance/'
+    try:
+        r = http.request('GET', url, headers={"Metadata-Flavor": "Google"})
+        if r.status != 200:
+            raise Exception
+        return True
+    except Exception:
+            return False
+
+
 def is_ec2_host():
     http = urllib3.PoolManager(timeout=.1)
     url = 'http://169.254.169.254/latest/api/token'
     try:
-        r = http.request('PUT', url)
+        r = http.request('PUT', url, headers={"X-aws-ec2-metadata-token-ttl-seconds": 30})
+        if r.status != 200:
+            raise Exception
         return True
     except Exception:
         return is_ec2_host_imds_v1_fallback()
@@ -283,7 +330,13 @@ def is_ec2_host_imds_v1_fallback():
     url = 'http://169.254.169.254/latest/meta-data/instance-id'
     try:
         r = http.request('GET', url)
-        return True
+        pattern="^i-[a-f0-9]{8}(?:[a-f0-9]{9})?$"
+        # Check the response if it is returning the right instance id.
+        # The medatada endpoint works on VMWare vm but it's not the value we are expecting.
+        if re.match(pattern, r.data.decode('utf-8')):
+            return True
+        else:
+            raise Exception
     except Exception:
         return False
 
